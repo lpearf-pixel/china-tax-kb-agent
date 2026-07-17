@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - .bootstrap/project.tar.gz
+      - .bootstrap/**
   workflow_dispatch:
 
 permissions:
