@@ -1,0 +1,53 @@
+name: Bootstrap Repository Import
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .bootstrap/project.tar.gz
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify and unpack project
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "4b34a25069039cdfc59f68d6fcc8341ad4ac6e501733db2b95351bd389d32ee3  .bootstrap/project.tar.gz" | sha256sum -c -
+          tar -xzf .bootstrap/project.tar.gz -C .
+          rm -rf .bootstrap
+          rm -f .github/workflows/bootstrap-import.yml
+
+      - name: Verify imported knowledge base
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd 90-工具
+          python -m unittest discover -s tests -v
+          python taxkb_validate.py --report /tmp/taxkb-validation.md
+          python taxkb_export.py --profile full --output /tmp/taxkb-chunks.jsonl
+          python taxkb_eval.py --chunks /tmp/taxkb-chunks.jsonl --report /tmp/taxkb-eval.md
+
+      - name: Commit complete project
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No import changes to commit"
+            exit 0
+          fi
+          git commit -m "feat: import V5 Xinjiang and Hainan tax knowledge base"
+          git push origin HEAD:main
