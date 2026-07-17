@@ -1,0 +1,90 @@
+{
+  "generated_at": "2026-07-17",
+  "scope": "national+xinjiang+hainan",
+  "national": [
+    {
+      "id": "npc_flk",
+      "name": "国家法律法规数据库",
+      "jurisdiction": "CN",
+      "level": "法律/行政法规",
+      "url": "https://flk.npc.gov.cn/",
+      "priority": 1,
+      "watch_type": "index"
+    },
+    {
+      "id": "state_council_policy",
+      "name": "中国政府网政策文件库",
+      "jurisdiction": "CN",
+      "level": "国务院文件",
+      "url": "https://www.gov.cn/zhengce/",
+      "priority": 1,
+      "watch_type": "index"
+    },
+    {
+      "id": "sta_policy",
+      "name": "国家税务总局政策法规库",
+      "jurisdiction": "CN",
+      "level": "税务部门规章/规范性文件/解读",
+      "url": "https://fgk.chinatax.gov.cn/",
+      "priority": 1,
+      "watch_type": "index"
+    },
+    {
+      "id": "mof_tax_policy",
+      "name": "财政部税政司政策发布",
+      "jurisdiction": "CN",
+      "level": "财税文件",
+      "url": "https://szs.mof.gov.cn/zhengcefabu/",
+      "priority": 1,
+      "watch_type": "index"
+    },
+    {
+      "id": "sta_12366",
+      "name": "12366纳税服务平台",
+      "jurisdiction": "CN",
+      "level": "咨询与办税口径（辅助证据）",
+      "url": "https://12366.chinatax.gov.cn/",
+      "priority": 3,
+      "watch_type": "index"
+    }
+  ],
+  "regions": [
+    {
+      "id": "region_cn_xj_gov",
+      "name": "新疆维吾尔自治区人民政府",
+      "jurisdiction": "CN-XJ",
+      "level": "自治区政府文件",
+      "url": "https://www.xinjiang.gov.cn/",
+      "priority": 2,
+      "watch_type": "homepage"
+    },
+    {
+      "id": "region_cn_xj_tax",
+      "name": "国家税务总局新疆维吾尔自治区税务局",
+      "jurisdiction": "CN-XJ",
+      "level": "新疆税务文件/解读/办税口径",
+      "url": "https://xinjiang.chinatax.gov.cn/",
+      "priority": 1,
+      "watch_type": "homepage"
+    },
+    {
+      "id": "region_cn_hi_gov",
+      "name": "海南省人民政府",
+      "jurisdiction": "CN-HI",
+      "level": "海南省政府及自贸港政策",
+      "url": "https://www.hainan.gov.cn/",
+      "priority": 2,
+      "watch_type": "homepage"
+    },
+    {
+      "id": "region_cn_hi_tax",
+      "name": "国家税务总局海南省税务局",
+      "jurisdiction": "CN-HI",
+      "level": "海南税务文件/解读/办税口径",
+      "url": "https://hainan.chinatax.gov.cn/",
+      "priority": 1,
+      "watch_type": "homepage"
+    }
+  ],
+  "programs": []
+}

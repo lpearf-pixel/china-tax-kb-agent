@@ -1,0 +1,27 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+
+# Obsidian per-device state
+.obsidian/workspace*.json
+.obsidian/cache/
+.trash/
+
+# Runtime logs and update fingerprints
+90-工具/logs/*
+!90-工具/logs/README.md
+90-工具/state/*
+!90-工具/state/README.md
+
+# Newly discovered policies must be reviewed before commit
+10-法规更新记录/待审核/*
+!10-法规更新记录/待审核/README.md
+
+# Generated retrieval index
+90-工具/output/

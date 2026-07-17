@@ -1,3 +1,85 @@
-# China Tax Knowledge Base Agent
+# 中国税务知识库 Agent
 
-Repository bootstrap in progress. The complete V5 Xinjiang + Hainan knowledge base will be imported automatically.
+当前版本：`KB-2026.07.17-V5-PILOT-XJ-HI`
+
+以 **Obsidian 为本地知识事实源**，采用固定税务 Workflow、条款级混合检索、法规效力关系和人工审签，辅助查询与解释中国现行税收政策。
+
+> 全国增值税规则底座 + 新疆覆盖层 + 海南自由贸易港覆盖层 + Workflow + RAG + 有限 Agent
+
+## 当前试点范围
+
+- 税种：增值税；
+- 重点主体：小规模纳税人、自然人、个体工商户；
+- 重点地域：新疆维吾尔自治区、海南自由贸易港；
+- 业务日期：优先覆盖 2026 年增值税新体系；
+- 高风险事项：只做预审、资料清单和风险提示，不替代主管税务机关、注册税务师或律师结论。
+
+## 核心设计
+
+```text
+识别问题与必要事实
+→ 同时检索全国规则和对应地域覆盖层
+→ 按业务日期核验条款效力
+→ 检查修改、废止、延期和替代关系
+→ 生成通俗解释与法规引用
+→ 高风险事项进入人工审签
+```
+
+正式答案只能把 `01-法规原文` 和 `02-条款结构` 作为法律证据；概念卡、场景卡和案例卡只能辅助理解和规划。
+
+## 使用 Obsidian
+
+1. 克隆或下载仓库；
+2. 在 Obsidian 中选择“打开本地库”；
+3. 选择仓库根目录；
+4. 从 `00-首页/知识库首页.md` 开始。
+
+## 本地验证
+
+工具只依赖 Python 3 标准库，建议 Python 3.10+。
+
+```bash
+cd 90-工具
+python3 -m unittest discover -s tests -v
+python3 taxkb_validate.py
+python3 taxkb_export.py --profile full
+python3 taxkb_eval.py
+```
+
+## 示例查询
+
+新疆：
+
+```bash
+cd 90-工具
+python3 taxkb_query.py "新疆小规模纳税人季度销售额24万元" \
+  --jurisdiction CN-XJ --valid-on 2026-07-17 --tax-type 增值税
+```
+
+海南：
+
+```bash
+cd 90-工具
+python3 taxkb_query.py "海南企业提供软件咨询是否适用零关税" \
+  --jurisdiction CN-HI --valid-on 2026-07-17
+```
+
+## 法规更新
+
+```bash
+cd 90-工具
+python3 taxkb_update.py
+```
+
+变化只写入 `10-法规更新记录/待审核/`，不会自动覆盖正式知识。人工确认后，再更新法规卡、条款状态、关系卡和回归测试。
+
+## 项目文档
+
+- [项目路线图](docs/ROADMAP.md)
+- [安全与使用边界](SECURITY.md)
+- [贡献指南](CONTRIBUTING.md)
+- [V5 正式基线](12-决策记录/V5正式基线.md)
+
+## 免责声明
+
+法规卡主要保存关键条款摘录、结构化摘要和官方来源链接，不宣称是所有法规及附件的完整离线镜像。正式申报、合同安排和税务规划必须回到官方原文，并核验交易日期、主体资格和地方执行口径。
