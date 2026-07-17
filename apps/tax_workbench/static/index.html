@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>中国税务规划工作台</title>
+  <style>
+    :root { color-scheme: light dark; font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #f4f6f8; color: #15202b; }
+    header { padding: 28px max(24px, calc((100vw - 1180px)/2)); background: #102a43; color: white; }
+    header h1 { margin: 0 0 8px; font-size: 28px; }
+    header p { margin: 0; opacity: .82; }
+    main { max-width: 1180px; margin: 24px auto; padding: 0 20px 60px; display: grid; grid-template-columns: 390px 1fr; gap: 20px; }
+    .panel { background: white; border: 1px solid #d9e2ec; border-radius: 14px; padding: 20px; box-shadow: 0 8px 24px rgba(16,42,67,.06); }
+    h2, h3 { margin-top: 0; }
+    label { display: block; font-size: 13px; font-weight: 650; margin: 13px 0 6px; }
+    input, select, textarea { width: 100%; padding: 10px 11px; border: 1px solid #bcccdc; border-radius: 8px; background: white; color: #15202b; }
+    textarea { min-height: 86px; resize: vertical; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .flags { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 10px; }
+    .flags label { display: flex; align-items: center; gap: 7px; margin: 0; font-weight: 500; }
+    .flags input { width: auto; }
+    button { border: 0; border-radius: 9px; padding: 11px 15px; font-weight: 700; cursor: pointer; }
+    .primary { background: #167d9a; color: white; width: 100%; margin-top: 16px; }
+    .secondary { background: #e6eef5; color: #102a43; }
+    .actions { display: flex; gap: 10px; margin-bottom: 16px; }
+    .notice { padding: 12px; border-radius: 9px; background: #fff8e1; border: 1px solid #f5c66a; margin: 12px 0; }
+    .danger { background: #fff0f0; border-color: #e57373; }
+    .result-header { display: flex; justify-content: space-between; gap: 16px; align-items: start; }
+    .pill { display: inline-block; padding: 5px 9px; border-radius: 99px; background: #e8f5e9; font-size: 12px; font-weight: 700; }
+    .pill.review { background: #ffebee; color: #a52727; }
+    .scheme { border: 1px solid #d9e2ec; border-radius: 11px; padding: 16px; margin: 14px 0; }
+    .scheme h3 { margin-bottom: 7px; }
+    ul { padding-left: 20px; }
+    .evidence { border-left: 3px solid #167d9a; padding: 8px 12px; margin: 9px 0; background: #f7fafc; }
+    .muted { color: #627d98; font-size: 13px; }
+    #empty { text-align: center; padding: 80px 20px; color: #829ab1; }
+    @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+    @media (prefers-color-scheme: dark) {
+      body { background: #111820; color: #e6edf3; }
+      .panel { background: #17212b; border-color: #314356; }
+      input, select, textarea { background: #111820; color: #e6edf3; border-color: #486581; }
+      .secondary { background: #314356; color: #fff; }
+      .evidence { background: #111820; }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <h1>中国税务规划工作台</h1>
+  <p>先确认事实，再检索有效法规，最后生成可审计的方案草案。</p>
+</header>
+<main>
+  <section class="panel">
+    <h2>业务事实</h2>
+    <form id="facts-form">
+      <div class="row">
+        <div><label>业务日期</label><input name="business_date" type="date" value="2026-07-17" required></div>
+        <div><label>地区</label><select name="region"><option value="CN-XJ">新疆</option><option value="CN-HI">海南</option><option value="CN">全国/其他</option></select></div>
+      </div>
+      <div class="row">
+        <div><label>主体类型</label><select name="taxpayer_type"><option>企业</option><option>个体工商户</option><option>自然人</option><option>其他组织</option></select></div>
+        <div><label>增值税身份</label><select name="vat_status"><option>小规模纳税人</option><option>一般纳税人</option><option>未知</option></select></div>
+      </div>
+      <div class="row">
+        <div><label>交易类型</label><select name="transaction_type"><option>服务</option><option>货物</option><option>无形资产</option><option>不动产</option><option>进口货物</option><option>其他</option></select></div>
+        <div><label>计税期间</label><select name="amount_period"><option>季度</option><option>月</option><option>单次</option><option>年度</option></select></div>
+      </div>
+      <div class="row">
+        <div><label>销售额/交易额</label><input name="amount" type="number" min="0" step="0.01" value="240000" required></div>
+        <div><label>发票需求</label><select name="invoice_need"><option>普通发票</option><option>专用发票</option><option>不确定</option><option>无需发票</option></select></div>
+      </div>
+      <label>规划目标</label><select name="objective"><option>合规降负</option><option>现金流优化</option><option>发票与报价</option><option>主体身份评估</option><option>海南政策预审</option></select>
+      <label>真实业务描述</label><textarea name="description" required>提供咨询服务</textarea>
+      <div class="row">
+        <div><label>海南商品 HS 编码</label><input name="hs_code" placeholder="仅海南货物场景需要"></div>
+        <div><label>海南享惠主体</label><select name="qualified_entity"><option value="">未确认</option><option value="true">是</option><option value="false">否</option></select></div>
+      </div>
+      <div class="flags">
+        <label><input type="checkbox" name="amount_tax_inclusive">金额含税</label>
+        <label><input type="checkbox" name="related_party">关联交易</label>
+        <label><input type="checkbox" name="cross_border">跨境业务</label>
+        <label><input type="checkbox" name="historical_tax">历史补税</label>
+        <label><input type="checkbox" name="real_estate">房地产事项</label>
+        <label><input type="checkbox" name="restructuring">企业重组</label>
+        <label><input type="checkbox" name="tax_audit">稽查争议</label>
+        <label><input type="checkbox" name="hainan_special_scene">海南特殊场景</label>
+      </div>
+      <button class="primary" type="submit">生成税务方案草案</button>
+    </form>
+  </section>
+  <section class="panel">
+    <div class="actions"><button id="save" class="secondary" disabled>保存到 Obsidian</button></div>
+    <div id="empty">填写左侧事实后生成方案。系统不会根据模型记忆自行创造税率或优惠。</div>
+    <div id="result" hidden></div>
+  </section>
+</main>
+<script>
+const form = document.querySelector('#facts-form');
+const result = document.querySelector('#result');
+const empty = document.querySelector('#empty');
+const saveButton = document.querySelector('#save');
+let lastFacts = null;
+
+function formData() {
+  const data = Object.fromEntries(new FormData(form).entries());
+  for (const input of form.querySelectorAll('input[type=checkbox]')) data[input.name] = input.checked;
+  data.qualified_entity = data.qualified_entity === '' ? null : data.qualified_entity === 'true';
+  return data;
+}
+function list(items) { return `<ul>${(items || []).map(x => `<li>${escapeHtml(x)}</li>`).join('')}</ul>`; }
+function escapeHtml(value) { const div = document.createElement('div'); div.textContent = value ?? ''; return div.innerHTML; }
+function render(data) {
+  const review = data.human_review_required;
+  result.innerHTML = `
+    <div class="result-header"><div><h2>方案结果</h2><span class="pill ${review ? 'review' : ''}">${review ? '必须人工审签' : '初步低风险'}</span></div><div class="muted">${escapeHtml(data.kb_version)}<br>${escapeHtml(data.verified_at)}</div></div>
+    <div class="notice ${review ? 'danger' : ''}"><strong>初步结论：</strong>${escapeHtml(data.initial_conclusion)}</div>
+    <h3>地域适用</h3><p>${escapeHtml(data.regional_application)}</p>
+    ${data.missing_facts?.length ? `<h3>待补事实</h3>${list(data.missing_facts)}` : ''}
+    <h3>法规依据</h3>${(data.evidence || []).map(e => `<div class="evidence"><strong>${escapeHtml(e.title)}</strong><div class="muted">${escapeHtml(e.document_number)} ${escapeHtml(e.article)} · ${escapeHtml(e.path)}</div><p>${escapeHtml(e.excerpt.slice(0,260))}</p></div>`).join('') || '<p>未找到足够A级证据。</p>'}
+    <h3>税务方案</h3>${(data.schemes || []).map(s => `<div class="scheme"><h3>${escapeHtml(s.name)}</h3><p>${escapeHtml(s.summary)}</p><strong>执行动作</strong>${list(s.actions)}<strong>预期价值</strong>${list(s.benefits)}<strong>风险边界</strong>${list(s.risks)}<strong>所需资料</strong>${list(s.required_documents)}<p><strong>税负提示：</strong>${escapeHtml(s.estimated_tax)}</p></div>`).join('')}
+    <h3>风险提示</h3>${list(data.risks)}
+    <p class="muted">${escapeHtml(data.disclaimer)}</p>`;
+  empty.hidden = true; result.hidden = false; saveButton.disabled = false;
+}
+async function call(path, facts) {
+  const response = await fetch(path, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(facts)});
+  const data = await response.json();
+  if (!response.ok) throw new Error((data.errors || [data.error || '请求失败']).join('\n'));
+  return data;
+}
+form.addEventListener('submit', async event => {
+  event.preventDefault();
+  lastFacts = formData();
+  empty.hidden = false; empty.textContent = '正在按地域、日期和证据等级检索…'; result.hidden = true; saveButton.disabled = true;
+  try { render(await call('/api/analyze', lastFacts)); }
+  catch (error) { empty.textContent = error.message; }
+});
+saveButton.addEventListener('click', async () => {
+  if (!lastFacts) return;
+  saveButton.disabled = true;
+  try { const data = await call('/api/save', lastFacts); alert(`已保存：${data.saved_path}`); }
+  catch (error) { alert(error.message); }
+  finally { saveButton.disabled = false; }
+});
+</script>
+</body>
+</html>

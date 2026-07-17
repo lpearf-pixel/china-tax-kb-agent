@@ -28,6 +28,9 @@ jobs:
         working-directory: 90-工具
         run: python -m unittest discover -s tests -v
 
+      - name: Workbench tests
+        run: python -m unittest discover -s apps/tax_workbench/tests -v
+
       - name: Validate Vault metadata and links
         working-directory: 90-工具
         run: python taxkb_validate.py --report /tmp/taxkb-validation.md
