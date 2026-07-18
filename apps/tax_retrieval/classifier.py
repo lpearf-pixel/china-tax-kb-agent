@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from .models import RetrievalCandidate
 
 _STATUS_ALIASES = {
@@ -28,6 +30,8 @@ class EvidenceClassifier:
         if status in {"uncertain", "pending_review"} or any(term in text for term in self.CONFLICT_TERMS):
             return "conflict", [f"status:{status}" if status in {"uncertain", "pending_review"} else "conflict_keyword"]
         exclusion_hits = [term for term in self.EXCLUSION_TERMS if term in text]
+        if re.search(r"除.{0,50}(?:之外|以外)", text):
+            exclusion_hits.append("除…之外")
         if exclusion_hits:
             return "exclusion", [f"keyword:{term}" for term in exclusion_hits[:3]]
         limitation_hits = [term for term in self.LIMITATION_TERMS if term in text]
