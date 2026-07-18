@@ -45,6 +45,20 @@ class TaxPlanningService:
         return bundle.selected.get(group)
 
     def _calculations(self, facts, bundle):
+        if not bundle.evaluations:
+            return [
+                CalculationResult(
+                    "calc-rule-set-missing",
+                    "unable_to_calculate",
+                    "增值税",
+                    inputs={
+                        "scenario_name": "目标日期规则集待更新",
+                        "decision_variables": {},
+                    },
+                    missing_fact_ids=["rules.valid_on_rule_set"],
+                    formula="目标业务日期没有加载到可用增值税规则，停止确定性计算。",
+                )
+            ]
         threshold = self._selected(bundle, "vat_threshold")
         threshold_ok = bool(
             threshold
@@ -171,7 +185,9 @@ class TaxPlanningService:
             or facts.transaction_type == "进口货物"
             or facts.cross_border
         )
-        if special:
+        if not bundle.evaluations:
+            initial = "目标业务日期没有可用规则集，系统已停止确定性税额计算并要求更新法规规则。"
+        elif special:
             initial = "海南自贸港特殊政策关键事实不足，目前不能确定零关税或其他优惠是否适用。"
         elif threshold_ok:
             initial = (
@@ -219,6 +235,16 @@ class TaxPlanningService:
             )
         )
         review = any(scenario.human_review_required for scenario in scenarios) or bool(bundle.conflicts)
+        if not bundle.evaluations:
+            risks.append("目标日期缺少已验证规则集，禁止使用默认税率替代正式规则。")
+            missing.append("目标日期有效增值税规则集")
+            review = True
+        if not evidence:
+            risks.append("未检索到足够的A级有效法规证据，当前结果不得作为确定结论。")
+            missing.append("A级有效法规证据")
+            review = True
+        risks = list(dict.fromkeys(risks))
+        missing = list(dict.fromkeys(missing))
         return PlanningResult(
             initial,
             [
