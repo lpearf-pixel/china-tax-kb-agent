@@ -39,12 +39,15 @@ class QueryPlanner:
         historical_requested = historical_flag or any(term in description for term in self.HISTORICAL_TERMS)
         region_name = {"CN-XJ": "新疆", "CN-HI": "海南", "CN": "全国"}.get(region, region)
         base = _compact(description, taxpayer, vat_status, transaction, period, objective, region_name, *issue_terms)
+        version_statuses = ["effective", "partially_effective", "pending_review", "uncertain"]
+        if historical_requested:
+            version_statuses.extend(["repealed", "expired"])
         queries = [
             QuerySpec("q-main", "main", base, optional_terms=(transaction, region_name)),
             QuerySpec("q-eligibility", "eligibility", _compact(base, "纳税人身份 起征点 免税 3%减按1% 一般纳税人登记"), optional_terms=("起征点", "1%", "登记")),
             QuerySpec("q-limitation", "limitation", _compact(base, "适用条件 必须 核验 同一计税期间 全部销售额", invoice, "放弃免税 专用发票"), optional_terms=("条件", "必须", "核验")),
             QuerySpec("q-exclusion", "exclusion", _compact(base, "不适用 除外 排除 不得", "销售出租不动产 转让土地使用权 关联分拆" if related else "销售出租不动产 转让土地使用权"), optional_terms=("不适用", "除外", "排除")),
-            QuerySpec("q-version", "version", _compact(base, valid_on, "生效日期 有效期 延期 修改 废止 替代"), optional_terms=("有效期", "废止", "替代"), statuses=("effective", "partially_effective", "repealed", "expired") if historical_requested else ("effective", "partially_effective")),
+            QuerySpec("q-version", "version", _compact(base, valid_on, "生效日期 有效期 延期 修改 废止 替代 待复核 效力争议"), optional_terms=("有效期", "废止", "替代", "待复核"), statuses=tuple(version_statuses)),
         ]
         if region in {"CN-XJ", "CN-HI"}:
             local_terms = "全国规则 地方覆盖 上位法 执行口径"
