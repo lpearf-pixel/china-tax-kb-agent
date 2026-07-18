@@ -67,6 +67,13 @@ class HybridRetrievalEngine:
     def _candidate_id(doc: dict) -> str:
         return str(doc.get("chunk_id") or f"{doc.get('path')}::{doc.get('heading')}")
 
+    @staticmethod
+    def _provider_query(plan: QueryPlan, spec) -> str:
+        terms = [spec.role, plan.tax_type or "税收", plan.jurisdiction]
+        terms.extend(spec.required_terms)
+        terms.extend(spec.optional_terms)
+        return " ".join(str(term).strip() for term in terms if term).strip()[:300]
+
     def recall(self, plan: QueryPlan, docs: list[dict] | None = None, per_query_k: int = 20) -> tuple[list[RetrievalCandidate], RetrievalTrace]:
         all_docs = docs if docs is not None else self.load_docs()
         bm25_rank, _, filter_docs, _, _ = self._tools()
@@ -84,7 +91,7 @@ class HybridRetrievalEngine:
                 try:
                     provider_name = self.embedding_provider.__class__.__name__
                     texts = [HashingVectorIndex._doc_text(doc) for doc in gated]
-                    vectors = self.embedding_provider.embed([spec.text] + texts)
+                    vectors = self.embedding_provider.embed([self._provider_query(plan, spec)] + texts)
                     query_vector, doc_vectors = vectors[0], vectors[1:]
                     def cosine(left, right):
                         import math
