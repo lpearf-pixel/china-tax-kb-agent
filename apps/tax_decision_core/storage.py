@@ -87,6 +87,29 @@ class CaseStorage:
         self._atomic_json(path, payload)
         return path
 
+    def load_version(self, case_id: str, kind: str, version: int) -> dict[str, Any]:
+        if version < 1:
+            raise ValueError("version must be >= 1")
+        safe_kind = self._validate_kind(kind)
+        path = self._case_dir(case_id) / f"{safe_kind}-v{version:03d}.json"
+        if not path.exists():
+            raise FileNotFoundError(path)
+        return json.loads(path.read_text(encoding="utf-8"))
+
+    def latest_version(self, case_id: str, kind: str) -> int:
+        safe_kind = self._validate_kind(kind)
+        case_dir = self._case_dir(case_id)
+        if not case_dir.exists():
+            raise FileNotFoundError(case_dir)
+        versions = []
+        for path in case_dir.glob(f"{safe_kind}-v*.json"):
+            match = re.fullmatch(rf"{re.escape(safe_kind)}-v(\d{{3}})\.json", path.name)
+            if match:
+                versions.append(int(match.group(1)))
+        if not versions:
+            raise FileNotFoundError(f"no {safe_kind} versions for {case_id}")
+        return max(versions)
+
     def append_event(self, case_id: str, event: dict[str, Any]) -> Path:
         case_dir = self._case_dir(case_id)
         if not (case_dir / "case.json").exists():
