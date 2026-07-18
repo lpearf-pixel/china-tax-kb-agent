@@ -19,6 +19,7 @@ class HybridRetrievalEngine:
     def __init__(self, vault: Path, docs: list[dict] | None = None, embedding_provider: EmbeddingProvider | None = None):
         self.vault = Path(vault).resolve()
         self._docs = docs
+        self._historical_docs: list[dict] | None = None
         self.embedding_provider = embedding_provider
         self.query_planner = QueryPlanner()
         self.classifier = EvidenceClassifier()
@@ -49,6 +50,19 @@ class HybridRetrievalEngine:
         self._docs = docs
         return docs
 
+    def load_historical_docs(self) -> list[dict]:
+        if self._historical_docs is not None:
+            return self._historical_docs
+        _, chunk_markdown, _, _, _ = self._tools()
+        docs: list[dict] = []
+        archive = self.vault / "99-归档" / "已废止"
+        if archive.exists():
+            for note in archive.rglob("*.md"):
+                rel = note.relative_to(self.vault).as_posix()
+                docs.extend(chunk_markdown(rel, note.read_text(encoding="utf-8", errors="replace")))
+        self._historical_docs = docs
+        return docs
+
     @staticmethod
     def _candidate_id(doc: dict) -> str:
         return str(doc.get("chunk_id") or f"{doc.get('path')}::{doc.get('heading')}")
@@ -61,7 +75,8 @@ class HybridRetrievalEngine:
         rankings: list[list[str]] = []
         provider_name = "local_hashing"
         for spec in plan.queries:
-            gated = filter_docs(all_docs, jurisdiction=plan.jurisdiction, valid_on=plan.valid_on, tax_type=plan.tax_type, evidence_tiers={"A"}, statuses=set(spec.statuses))
+            gate_date = None if plan.historical_requested and spec.role == "version" else plan.valid_on
+            gated = filter_docs(all_docs, jurisdiction=plan.jurisdiction, valid_on=gate_date, tax_type=plan.tax_type, evidence_tiers={"A"}, statuses=set(spec.statuses))
             trace.documents_after_gate = max(trace.documents_after_gate, len(gated))
             lexical = bm25_rank(spec.text, gated, top_k=per_query_k)
             vector_rows: list[tuple[dict, float]]
@@ -114,6 +129,9 @@ class HybridRetrievalEngine:
     def search_bundle(self, facts: Any, issues: list[Any] | None = None, top_k: int = 8) -> EvidenceBundle:
         plan = self.query_planner.plan(facts, issues)
         all_docs = self.load_docs()
+        if plan.historical_requested:
+            current_ids = {self._candidate_id(doc) for doc in all_docs}
+            all_docs = all_docs + [doc for doc in self.load_historical_docs() if self._candidate_id(doc) not in current_ids]
         candidates, trace = self.recall(plan, all_docs, per_query_k=max(top_k * 3, 12))
         by_path: dict[str, list[dict]] = {}
         for doc in all_docs:
