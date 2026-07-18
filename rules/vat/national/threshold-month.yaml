@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "status": "effective",
+  "tax_type": "增值税",
+  "tags": ["V7", "deterministic"],
+  "rule_id": "VAT-SMALL-THRESHOLD-MONTH-2026",
+  "valid_from": "2026-01-01",
+  "valid_to": "2027-12-31",
+  "jurisdiction": "CN",
+  "priority": 100,
+  "exclusive_group": "vat_threshold",
+  "description": "小规模纳税人月起征点候选",
+  "when": {"all": [
+    {"fact": "taxpayer.vat_status", "operator": "equals", "value": "小规模纳税人"},
+    {"fact": "transaction.amount_period", "operator": "equals", "value": "月"},
+    {"fact": "transaction.total_sales_same_period", "operator": "less_or_equal", "value": 100000},
+    {"not": {"fact": "invoice.waive_exemption", "operator": "equals", "value": true}}
+  ]},
+  "then": {"outcome": "threshold_exempt_candidate", "value": true, "confidence": "deterministic"},
+  "requires": ["transaction.total_sales_same_period", "invoice.waive_exemption"],
+  "legal_basis": [{"document_id": "DOC-CN-VAT-MOF-STA-2026-10", "provision_id": "PROV-VAT-ANN10-THRESHOLD"}]
+}
