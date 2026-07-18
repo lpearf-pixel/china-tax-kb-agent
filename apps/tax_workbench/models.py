@@ -150,7 +150,9 @@ class EvidenceItem:
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
-        payload.pop("_retrieval_trace", None)
+        trace = payload.pop("_retrieval_trace", {})
+        if trace:
+            payload["retrieval_trace"] = trace
         return payload
 
 
@@ -196,10 +198,13 @@ class PlanningResult:
         payload = asdict(self)
         for row in payload.get("evidence", []):
             row.pop("_retrieval_trace", None)
+            row.pop("retrieval_trace", None)
         if not self.evidence_groups:
             groups = {role: [] for role in EVIDENCE_ROLES}
             for item in self.evidence:
-                groups.setdefault(item.role, []).append(item.to_dict())
+                public = item.to_dict()
+                public.pop("retrieval_trace", None)
+                groups.setdefault(item.role, []).append(public)
             payload["evidence_groups"] = groups
         if not self.retrieval_trace:
             payload["retrieval_trace"] = next((item._retrieval_trace for item in self.evidence if item._retrieval_trace), {})
