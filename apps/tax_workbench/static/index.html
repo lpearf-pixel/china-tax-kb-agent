@@ -3,221 +3,112 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>中国税务决策工作台 V7</title>
+  <title>中国税务决策工作台 V7.1</title>
   <style>
-    :root { color-scheme: light dark; font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    :root { color-scheme: light dark; font-family: Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
     * { box-sizing: border-box; }
-    body { margin: 0; background: #f4f6f8; color: #15202b; }
-    header { padding: 25px max(24px, calc((100vw - 1420px)/2)); background: #102a43; color: white; }
-    header h1 { margin: 0 0 7px; font-size: 27px; }
-    header p { margin: 0; opacity: .82; }
-    main { max-width: 1420px; margin: 20px auto; padding: 0 18px 60px; display: grid; grid-template-columns: 370px minmax(0, 1fr); gap: 18px; }
-    .panel { background: white; border: 1px solid #d9e2ec; border-radius: 13px; padding: 18px; box-shadow: 0 8px 24px rgba(16,42,67,.06); }
-    h2, h3, h4 { margin-top: 0; }
-    h3 { margin-bottom: 9px; }
-    label { display: block; font-size: 13px; font-weight: 650; margin: 11px 0 5px; }
-    input, select, textarea { width: 100%; padding: 9px 10px; border: 1px solid #bcccdc; border-radius: 8px; background: white; color: #15202b; }
-    textarea { min-height: 76px; resize: vertical; }
-    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
-    .flags { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 10px; }
-    .flags label { display: flex; align-items: center; gap: 7px; margin: 0; font-weight: 500; }
-    .flags input { width: auto; }
-    button { border: 0; border-radius: 8px; padding: 10px 14px; font-weight: 700; cursor: pointer; }
-    button:disabled { opacity: .48; cursor: default; }
-    .primary { background: #167d9a; color: white; width: 100%; margin-top: 14px; }
-    .secondary { background: #e6eef5; color: #102a43; }
-    .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
-    .notice { padding: 12px; border-radius: 9px; background: #fff8e1; border: 1px solid #f5c66a; margin: 10px 0; line-height: 1.55; }
-    .danger { background: #fff0f0; border-color: #e57373; }
-    .result-header { display: flex; justify-content: space-between; gap: 16px; align-items: start; }
-    .pill { display: inline-block; padding: 5px 9px; border-radius: 99px; background: #e8f5e9; font-size: 12px; font-weight: 700; margin-right: 5px; }
-    .pill.review { background: #ffebee; color: #a52727; }
-    .pill.state { background: #e3f2fd; color: #164e73; }
-    .section { border-top: 1px solid #d9e2ec; padding-top: 16px; margin-top: 18px; }
-    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 11px; }
-    .card, .scheme { border: 1px solid #d9e2ec; border-radius: 10px; padding: 13px; background: #fbfcfd; overflow-wrap: anywhere; }
-    .scheme { margin: 11px 0; background: white; }
-    .card h4, .scheme h3 { margin-bottom: 6px; }
-    .evidence { border-left: 3px solid #167d9a; padding: 8px 12px; margin: 8px 0; background: #f7fafc; }
-    .rule.applicable { border-left: 4px solid #2e7d32; }
-    .rule.manual_review_required, .rule.conflict { border-left: 4px solid #c62828; }
-    .rule.insufficient_facts { border-left: 4px solid #ef6c00; }
-    .score-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 6px; margin: 8px 0; }
-    .score { background: #eef4f8; padding: 7px; border-radius: 7px; font-size: 12px; }
-    pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #102a43; color: #eaf2f8; padding: 10px; border-radius: 8px; font-size: 12px; }
-    ul { padding-left: 19px; }
-    .muted { color: #627d98; font-size: 12px; }
-    #empty { text-align: center; padding: 75px 20px; color: #829ab1; }
-    details { margin: 9px 0; }
-    summary { cursor: pointer; font-weight: 700; }
-    @media (max-width: 920px) { main { grid-template-columns: 1fr; } }
-    @media (prefers-color-scheme: dark) {
-      body { background: #111820; color: #e6edf3; }
-      .panel, .scheme { background: #17212b; border-color: #314356; }
-      .card { background: #111820; border-color: #314356; }
-      input, select, textarea { background: #111820; color: #e6edf3; border-color: #486581; }
-      .secondary { background: #314356; color: #fff; }
-      .evidence { background: #111820; }
-      .score { background: #253545; }
-      .section { border-color: #314356; }
+    body { margin:0; background:#f4f6f8; color:#15202b; }
+    header { padding:25px max(24px,calc((100vw - 1480px)/2)); background:#102a43; color:white; }
+    header h1 { margin:0 0 7px; font-size:27px; }
+    header p { margin:0; opacity:.82; }
+    main { max-width:1480px; margin:20px auto; padding:0 18px 60px; display:grid; grid-template-columns:370px minmax(0,1fr); gap:18px; }
+    .panel { background:white; border:1px solid #d9e2ec; border-radius:13px; padding:18px; box-shadow:0 8px 24px rgba(16,42,67,.06); }
+    h2,h3,h4 { margin-top:0; } h3 { margin-bottom:9px; }
+    label { display:block; font-size:13px; font-weight:650; margin:11px 0 5px; }
+    input,select,textarea { width:100%; padding:9px 10px; border:1px solid #bcccdc; border-radius:8px; background:white; color:#15202b; }
+    textarea { min-height:76px; resize:vertical; }
+    .row { display:grid; grid-template-columns:1fr 1fr; gap:9px; }
+    .flags { display:grid; grid-template-columns:1fr 1fr; gap:7px; margin-top:10px; }
+    .flags label { display:flex; align-items:center; gap:7px; margin:0; font-weight:500; }
+    .flags input { width:auto; }
+    button { border:0; border-radius:8px; padding:10px 14px; font-weight:700; cursor:pointer; }
+    button:disabled { opacity:.48; cursor:default; }
+    .primary { background:#167d9a; color:white; width:100%; margin-top:14px; }
+    .secondary { background:#e6eef5; color:#102a43; }
+    .actions { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
+    .notice { padding:12px; border-radius:9px; background:#fff8e1; border:1px solid #f5c66a; margin:10px 0; line-height:1.55; }
+    .danger { background:#fff0f0; border-color:#e57373; }
+    .result-header { display:flex; justify-content:space-between; gap:16px; align-items:start; }
+    .pill { display:inline-block; padding:5px 9px; border-radius:99px; background:#e8f5e9; font-size:12px; font-weight:700; margin-right:5px; }
+    .pill.review { background:#ffebee; color:#a52727; } .pill.state { background:#e3f2fd; color:#164e73; }
+    .section { border-top:1px solid #d9e2ec; padding-top:16px; margin-top:18px; }
+    .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:11px; }
+    .card,.scheme { border:1px solid #d9e2ec; border-radius:10px; padding:13px; background:#fbfcfd; overflow-wrap:anywhere; }
+    .scheme { margin:11px 0; background:white; }
+    .evidence { border-left:4px solid #167d9a; padding:10px 12px; margin:8px 0; background:#f7fafc; }
+    .evidence.limitation { border-left-color:#ef6c00; } .evidence.exclusion { border-left-color:#c62828; }
+    .evidence.historical { border-left-color:#616161; } .evidence.local { border-left-color:#6a1b9a; }
+    .evidence.conflict { border-left-color:#ad1457; }
+    .rule.applicable { border-left:4px solid #2e7d32; }
+    .rule.manual_review_required,.rule.conflict { border-left:4px solid #c62828; }
+    .rule.insufficient_facts { border-left:4px solid #ef6c00; }
+    .score-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:6px; margin:8px 0; }
+    .score { background:#eef4f8; padding:7px; border-radius:7px; font-size:12px; }
+    .query { border:1px solid #bcccdc; border-radius:8px; padding:9px; margin:7px 0; }
+    pre { white-space:pre-wrap; overflow-wrap:anywhere; background:#102a43; color:#eaf2f8; padding:10px; border-radius:8px; font-size:12px; }
+    ul { padding-left:19px; } .muted { color:#627d98; font-size:12px; }
+    #empty { text-align:center; padding:75px 20px; color:#829ab1; }
+    details { margin:9px 0; } summary { cursor:pointer; font-weight:700; }
+    @media(max-width:920px){ main{grid-template-columns:1fr;} }
+    @media(prefers-color-scheme:dark){
+      body{background:#111820;color:#e6edf3}.panel,.scheme{background:#17212b;border-color:#314356}.card{background:#111820;border-color:#314356}
+      input,select,textarea{background:#111820;color:#e6edf3;border-color:#486581}.secondary{background:#314356;color:#fff}.evidence{background:#111820}.score{background:#253545}.section{border-color:#314356}
     }
   </style>
 </head>
 <body>
-<header>
-  <h1>中国税务决策工作台 V7</h1>
-  <p>事实图谱 → 有效法规 → 规则判断 → Decimal计算 → 动态方案 → 人工审签</p>
-</header>
+<header><h1>中国税务决策工作台 V7.1</h1><p>事实图谱 → 查询拆解 → 混合检索 → 规则判断 → Decimal计算 → 动态方案 → 人工审签</p></header>
 <main>
   <section class="panel">
     <h2>案件事实</h2>
     <form id="facts-form">
-      <div class="row">
-        <div><label>业务日期</label><input name="business_date" type="date" value="2026-07-17" required></div>
-        <div><label>地区</label><select name="region"><option value="CN-XJ">新疆</option><option value="CN-HI">海南</option><option value="CN">全国/其他</option></select></div>
-      </div>
-      <div class="row">
-        <div><label>主体类型</label><select name="taxpayer_type"><option>企业</option><option>个体工商户</option><option>自然人</option><option>其他组织</option></select></div>
-        <div><label>增值税身份</label><select name="vat_status"><option>小规模纳税人</option><option>一般纳税人</option><option>未知</option></select></div>
-      </div>
-      <div class="row">
-        <div><label>交易类型</label><select name="transaction_type"><option>服务</option><option>货物</option><option>无形资产</option><option>不动产</option><option>进口货物</option><option>其他</option></select></div>
-        <div><label>计税期间</label><select name="amount_period"><option>季度</option><option>月</option><option>单次</option><option>年度</option></select></div>
-      </div>
-      <div class="row">
-        <div><label>销售额/交易额</label><input name="amount" type="number" min="0" step="0.01" value="240000" required></div>
-        <div><label>同期间全部销售额</label><input name="total_sales_same_period" type="number" min="0" step="0.01" value="240000"></div>
-      </div>
-      <div class="row">
-        <div><label>连续期间销售额</label><input name="rolling_sales" type="number" min="0" step="0.01" placeholder="一般纳税人登记判断"></div>
-        <div><label>原征收率</label><input name="original_levy_rate" type="number" min="0" step="0.01" value="0.03"></div>
-      </div>
+      <div class="row"><div><label>业务日期</label><input name="business_date" type="date" value="2026-07-17" required></div><div><label>地区</label><select name="region"><option value="CN-XJ">新疆</option><option value="CN-HI">海南</option><option value="CN">全国/其他</option></select></div></div>
+      <div class="row"><div><label>主体类型</label><select name="taxpayer_type"><option>企业</option><option>个体工商户</option><option>自然人</option><option>其他组织</option></select></div><div><label>增值税身份</label><select name="vat_status"><option>小规模纳税人</option><option>一般纳税人</option><option>未知</option></select></div></div>
+      <div class="row"><div><label>交易类型</label><select name="transaction_type"><option>服务</option><option>货物</option><option>无形资产</option><option>不动产</option><option>进口货物</option><option>其他</option></select></div><div><label>计税期间</label><select name="amount_period"><option>季度</option><option>月</option><option>单次</option><option>年度</option></select></div></div>
+      <div class="row"><div><label>销售额/交易额</label><input name="amount" type="number" min="0" step="0.01" value="240000" required></div><div><label>同期间全部销售额</label><input name="total_sales_same_period" type="number" min="0" step="0.01" value="240000"></div></div>
+      <div class="row"><div><label>连续期间销售额</label><input name="rolling_sales" type="number" min="0" step="0.01" placeholder="一般纳税人登记判断"></div><div><label>原征收率</label><input name="original_levy_rate" type="number" min="0" step="0.01" value="0.03"></div></div>
       <label>发票需求</label><select name="invoice_need"><option>普通发票</option><option>专用发票</option><option>不确定</option><option>无需发票</option></select>
       <label>规划目标</label><select name="objective"><option>合规降负</option><option>现金流优化</option><option>发票与报价</option><option>主体身份评估</option><option>海南政策预审</option></select>
       <label>真实业务描述</label><textarea name="description" required>提供咨询服务</textarea>
-      <div class="row">
-        <div><label>海南商品 HS 编码</label><input name="hs_code" placeholder="仅海南货物场景需要"></div>
-        <div><label>海南享惠主体</label><select name="qualified_entity"><option value="">未确认</option><option value="true">是</option><option value="false">否</option></select></div>
-      </div>
-      <div class="row">
-        <div><label>海南货物流向</label><input name="flow" placeholder="一线/二线/岛内"></div>
-        <div><label>商品用途与处置</label><input name="use" placeholder="生产、自用或后续销售"></div>
-      </div>
+      <div class="row"><div><label>海南商品 HS 编码</label><input name="hs_code" placeholder="仅海南货物场景需要"></div><div><label>海南享惠主体</label><select name="qualified_entity"><option value="">未确认</option><option value="true">是</option><option value="false">否</option></select></div></div>
+      <div class="row"><div><label>海南货物流向</label><input name="flow" placeholder="一线/二线/岛内"></div><div><label>商品用途与处置</label><input name="use" placeholder="生产、自用或后续销售"></div></div>
       <div class="flags">
-        <label><input type="checkbox" name="amount_tax_inclusive">金额含税</label>
-        <label><input type="checkbox" name="waive_exemption">放弃免税</label>
-        <label><input type="checkbox" name="related_party">关联交易</label>
-        <label><input type="checkbox" name="split_signal">存在分拆信号</label>
-        <label><input type="checkbox" name="cross_border">跨境业务</label>
-        <label><input type="checkbox" name="historical_tax">历史补税</label>
-        <label><input type="checkbox" name="real_estate">房地产事项</label>
-        <label><input type="checkbox" name="restructuring">企业重组</label>
-        <label><input type="checkbox" name="tax_audit">稽查争议</label>
-        <label><input type="checkbox" name="hainan_special_scene">海南特殊场景</label>
+        <label><input type="checkbox" name="amount_tax_inclusive">金额含税</label><label><input type="checkbox" name="waive_exemption">放弃免税</label>
+        <label><input type="checkbox" name="related_party">关联交易</label><label><input type="checkbox" name="split_signal">存在分拆信号</label>
+        <label><input type="checkbox" name="cross_border">跨境业务</label><label><input type="checkbox" name="historical_tax">历史补税</label>
+        <label><input type="checkbox" name="real_estate">房地产事项</label><label><input type="checkbox" name="restructuring">企业重组</label>
+        <label><input type="checkbox" name="tax_audit">稽查争议</label><label><input type="checkbox" name="hainan_special_scene">海南特殊场景</label>
       </div>
-      <button class="primary" type="submit">运行V7决策分析</button>
+      <button class="primary" type="submit">运行V7.1决策分析</button>
     </form>
   </section>
   <section class="panel">
-    <div class="actions">
-      <button id="save" class="secondary" disabled>建立案件并保存</button>
-      <button id="refresh" class="secondary" disabled>刷新案件</button>
-      <button id="audit" class="secondary" disabled>查看审计</button>
-    </div>
-    <div id="empty">填写左侧事实后开始。税率、优惠与税额只来自规则和法规证据。</div>
-    <div id="result" hidden></div>
+    <div class="actions"><button id="save" class="secondary" disabled>建立案件并保存</button><button id="refresh" class="secondary" disabled>刷新案件</button><button id="audit" class="secondary" disabled>查看审计</button></div>
+    <div id="empty">填写左侧事实后开始。法规必须通过日期、地域、效力与A级证据门禁。</div><div id="result" hidden></div>
   </section>
 </main>
 <script>
-const form = document.querySelector('#facts-form');
-const result = document.querySelector('#result');
-const empty = document.querySelector('#empty');
-const saveButton = document.querySelector('#save');
-const refreshButton = document.querySelector('#refresh');
-const auditButton = document.querySelector('#audit');
-let lastFacts = null;
-let currentCaseId = '';
-
-function formData() {
-  const data = Object.fromEntries(new FormData(form).entries());
-  for (const input of form.querySelectorAll('input[type=checkbox]')) data[input.name] = input.checked;
-  data.qualified_entity = data.qualified_entity === '' ? null : data.qualified_entity === 'true';
-  return data;
-}
-function escapeHtml(value) { const div = document.createElement('div'); div.textContent = value ?? ''; return div.innerHTML; }
-function typed(value) {
-  if (value && typeof value === 'object' && ['decimal','date','datetime'].includes(value.__type__)) return value.value;
-  if (value === null || value === undefined) return '';
-  if (typeof value === 'object') return JSON.stringify(value);
-  return String(value);
-}
-function list(items) { return `<ul>${(items || []).map(x => `<li>${escapeHtml(x)}</li>`).join('')}</ul>`; }
-function statusLabel(status) {
-  return ({applicable:'适用',not_applicable:'不适用',insufficient_facts:'事实不足',conflict:'规则冲突',manual_review_required:'人工复核'})[status] || status;
-}
-function renderIssues(items) {
-  return `<div class="cards">${(items || []).map(i => `<div class="card"><h4>${escapeHtml(i.issue_type)}</h4><div class="muted">${escapeHtml(i.issue_id)} · 风险 ${escapeHtml(i.risk_level)} · ${escapeHtml(i.status)}</div>${i.parent_issue_id ? `<p class="muted">父议题：${escapeHtml(i.parent_issue_id)}</p>` : ''}${i.missing_fact_ids?.length ? `<strong>缺失事实</strong>${list(i.missing_fact_ids)}` : ''}</div>`).join('')}</div>`;
-}
-function renderRules(items) {
-  return `<div class="cards">${(items || []).map(r => `<div class="card rule ${escapeHtml(r.status)}"><h4>${escapeHtml(r.rule_id)}</h4><div class="muted">${escapeHtml(statusLabel(r.status))} · 优先级 ${escapeHtml(r.priority)}</div><p><strong>${escapeHtml(r.outcome || '无输出')}</strong> = ${escapeHtml(typed(r.value))}</p>${r.missing_fact_ids?.length ? `<strong>缺失事实</strong>${list(r.missing_fact_ids)}` : ''}<details><summary>条件轨迹</summary><pre>${escapeHtml(JSON.stringify(r.trace || [], null, 2))}</pre></details></div>`).join('')}</div>`;
-}
-function renderCalculations(items) {
-  return `<div class="cards">${(items || []).map(c => `<div class="card"><h4>${escapeHtml(c.calculation_id)}</h4><div class="muted">${escapeHtml(c.status)} · ${escapeHtml(c.rounding || '')}</div><p><strong>税额：</strong>${escapeHtml(typed(c.tax_amount))}<br><strong>应纳/留抵：</strong>${escapeHtml(typed(c.payable_or_credit))}</p><pre>${escapeHtml(c.formula || '')}</pre>${c.missing_fact_ids?.length ? `<strong>缺失输入</strong>${list(c.missing_fact_ids)}` : ''}${(c.cashflow_events || []).map(e => `<div class="muted">${escapeHtml(e.date)} · ${escapeHtml(e.type)} · ${escapeHtml(e.amount)}</div>`).join('')}</div>`).join('')}</div>`;
-}
-function scoreMap(data) { return Object.fromEntries((data.scenario_scores || []).map(x => [x.scenario_id, x])); }
-function renderSchemes(data) {
-  const scores = scoreMap(data);
-  return (data.schemes || []).map((s, index) => {
-    const calc = (data.calculations || [])[index] || {};
-    const score = scores[`scenario-${calc.calculation_id}`] || {};
-    const components = Object.entries(score.components || {}).map(([k,v]) => `<div class="score"><strong>${escapeHtml(k)}</strong><br>${escapeHtml(v)}</div>`).join('');
-    return `<div class="scheme"><h3>${escapeHtml(s.name)}</h3><div class="pill">综合评分 ${escapeHtml(score.total_score || '未评分')}</div><p>${escapeHtml(s.summary)}</p>${components ? `<div class="score-grid">${components}</div>` : ''}<strong>执行动作</strong>${list(s.actions)}<strong>预期价值</strong>${list(s.benefits)}<strong>风险边界</strong>${list(s.risks)}<strong>所需资料</strong>${list(s.required_documents)}<p><strong>税负提示：</strong>${escapeHtml(s.estimated_tax)}</p></div>`;
-  }).join('');
-}
-function render(data) {
-  const review = data.human_review_required;
-  currentCaseId = data.case_id || currentCaseId;
-  result.innerHTML = `
-    <div class="result-header"><div><h2>决策结果</h2><span class="pill ${review ? 'review' : ''}">${review ? '必须人工审签' : '可继续评估'}</span><span class="pill state">${escapeHtml(data.case_state || 'stateless')}</span></div><div class="muted">案件 ${escapeHtml(data.case_id || '未持久化')}<br>${escapeHtml(data.kb_version)} · ${escapeHtml(data.verified_at)}</div></div>
-    <div class="notice ${review ? 'danger' : ''}"><strong>初步结论：</strong>${escapeHtml(data.initial_conclusion)}</div>
-    <h3>地域适用</h3><p>${escapeHtml(data.regional_application)}</p>
-    ${data.missing_facts?.length ? `<h3>待补事实</h3>${list(data.missing_facts)}` : ''}
-    <div class="section"><h3>税务议题树</h3>${renderIssues(data.issues)}</div>
-    <div class="section"><h3>法规依据</h3>${(data.evidence || []).map(e => `<div class="evidence"><strong>${escapeHtml(e.title)}</strong><div class="muted">${escapeHtml(e.document_number)} ${escapeHtml(e.article)} · ${escapeHtml(e.path)}</div><p>${escapeHtml((e.excerpt || '').slice(0,260))}</p></div>`).join('') || '<p>未找到足够A级证据。</p>'}</div>
-    <div class="section"><h3>规则判断轨迹</h3>${renderRules(data.rule_trace)}</div>
-    <div class="section"><h3>税额计算与现金流</h3>${renderCalculations(data.calculations)}</div>
-    <div class="section"><h3>动态税务方案</h3>${renderSchemes(data)}</div>
-    <div class="section"><h3>风险提示</h3>${list(data.risks)}<p class="muted">${escapeHtml(data.disclaimer)}</p></div>`;
-  empty.hidden = true; result.hidden = false; saveButton.disabled = false;
-  refreshButton.disabled = !currentCaseId; auditButton.disabled = !currentCaseId;
-}
-async function call(path, payload, method='POST') {
-  const options = {method, headers:{'Content-Type':'application/json'}};
-  if (payload !== undefined) options.body = JSON.stringify(payload);
-  const response = await fetch(path, options);
-  const data = await response.json();
-  if (!response.ok) throw new Error((data.errors || [data.error || '请求失败']).join('\n'));
-  return data;
-}
-form.addEventListener('submit', async event => {
-  event.preventDefault(); lastFacts = formData(); currentCaseId = '';
-  empty.hidden = false; empty.textContent = '正在构建议题、加载规则并执行计算…'; result.hidden = true;
-  saveButton.disabled = true; refreshButton.disabled = true; auditButton.disabled = true;
-  try { render(await call('/api/analyze', lastFacts)); } catch (error) { empty.textContent = error.message; }
-});
-saveButton.addEventListener('click', async () => {
-  if (!lastFacts) return; saveButton.disabled = true;
-  try { const data = await call('/api/save', lastFacts); render(data); alert(`案件 ${data.case_id} 已保存：${data.saved_path}`); }
-  catch (error) { alert(error.message); } finally { saveButton.disabled = false; }
-});
-refreshButton.addEventListener('click', async () => {
-  if (!currentCaseId) return;
-  try { const data = await call(`/api/cases/${currentCaseId}/analyze`, {}); render(data); } catch (error) { alert(error.message); }
-});
-auditButton.addEventListener('click', async () => {
-  if (!currentCaseId) return;
-  try { const data = await call(`/api/cases/${currentCaseId}/audit`, undefined, 'GET'); alert(JSON.stringify(data.events || [], null, 2)); } catch (error) { alert(error.message); }
-});
+const form=document.querySelector('#facts-form'),result=document.querySelector('#result'),empty=document.querySelector('#empty'),saveButton=document.querySelector('#save'),refreshButton=document.querySelector('#refresh'),auditButton=document.querySelector('#audit');
+let lastFacts=null,currentCaseId='';
+const roleLabels={support:'支持证据',limitation:'限制条件',exclusion:'排除证据',historical:'历史证据',local:'地方覆盖',conflict:'冲突证据'};
+function formData(){const data=Object.fromEntries(new FormData(form).entries());for(const input of form.querySelectorAll('input[type=checkbox]'))data[input.name]=input.checked;data.qualified_entity=data.qualified_entity===''?null:data.qualified_entity==='true';return data;}
+function escapeHtml(value){const div=document.createElement('div');div.textContent=value??'';return div.innerHTML;}
+function typed(value){if(value&&typeof value==='object'&&['decimal','date','datetime'].includes(value.__type__))return value.value;if(value===null||value===undefined)return'';if(typeof value==='object')return JSON.stringify(value);return String(value);}
+function list(items){return `<ul>${(items||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join('')}</ul>`;}
+function statusLabel(status){return({applicable:'适用',not_applicable:'不适用',insufficient_facts:'事实不足',conflict:'规则冲突',manual_review_required:'人工复核'})[status]||status;}
+function renderIssues(items){return `<div class="cards">${(items||[]).map(i=>`<div class="card"><h4>${escapeHtml(i.issue_type)}</h4><div class="muted">${escapeHtml(i.issue_id)} · 风险 ${escapeHtml(i.risk_level)} · ${escapeHtml(i.status)}</div>${i.parent_issue_id?`<p class="muted">父议题：${escapeHtml(i.parent_issue_id)}</p>`:''}${i.missing_fact_ids?.length?`<strong>缺失事实</strong>${list(i.missing_fact_ids)}`:''}</div>`).join('')}</div>`;}
+function renderEvidenceGroups(data){const groups=data.evidence_groups||{};return Object.keys(roleLabels).map(role=>{const rows=groups[role]||[];return `<details ${['support','limitation','exclusion'].includes(role)?'open':''}><summary>${roleLabels[role]}（${rows.length}）</summary>${rows.map(e=>`<div class="evidence ${role}"><strong>${escapeHtml(e.title)}</strong><div class="muted">${escapeHtml(e.document_number)} ${escapeHtml(e.article)} · ${escapeHtml(e.path)} · ${escapeHtml(e.status)} · 分数 ${escapeHtml(e.score)}</div>${e.valid_from||e.valid_to?`<div class="muted">有效区间 ${escapeHtml(e.valid_from||'未注明')} 至 ${escapeHtml(e.valid_to||'持续有效')}</div>`:''}${e.match_reasons?.length?`<div class="muted">命中：${escapeHtml(e.match_reasons.join('；'))}</div>`:''}<p>${escapeHtml((e.excerpt||'').slice(0,300))}</p><details><summary>评分构成</summary><pre>${escapeHtml(JSON.stringify(e.score_breakdown||{},null,2))}</pre></details></div>`).join('')||'<p class="muted">无</p>'}</details>`;}).join('');}
+function renderRetrievalTrace(trace){if(!trace||!trace.plan)return '<p class="muted">无检索轨迹</p>';const stats=trace.query_stats||{};const queries=(trace.plan.queries||[]).map(q=>{const row=stats[q.query_id]||{};return `<div class="query"><strong>${escapeHtml(q.query_id)} · ${escapeHtml(q.role)}</strong><p>${escapeHtml(q.text)}</p><div class="muted">门禁后 ${row.gated||0} · BM25 ${row.bm25||0} · 向量 ${row.vector||0}</div></div>`;}).join('');return `<div class="cards"><div class="card"><h4>检索统计</h4><div class="muted">Provider ${escapeHtml(trace.provider||'')} · 门禁前 ${trace.documents_before_gate||0} · 门禁后 ${trace.documents_after_gate||0} · 候选 ${trace.candidate_count||0} · 关系扩展 ${trace.relation_expanded_count||0} · 最终 ${trace.selected_count||0}</div>${trace.provider_errors?.length?`<p class="notice danger">Provider回退：${escapeHtml(trace.provider_errors.join('；'))}</p>`:''}</div></div>${queries}`;}
+function renderRules(items){return `<div class="cards">${(items||[]).map(r=>`<div class="card rule ${escapeHtml(r.status)}"><h4>${escapeHtml(r.rule_id)}</h4><div class="muted">${escapeHtml(statusLabel(r.status))} · 优先级 ${escapeHtml(r.priority)}</div><p><strong>${escapeHtml(r.outcome||'无输出')}</strong> = ${escapeHtml(typed(r.value))}</p>${r.missing_fact_ids?.length?`<strong>缺失事实</strong>${list(r.missing_fact_ids)}`:''}<details><summary>条件轨迹</summary><pre>${escapeHtml(JSON.stringify(r.trace||[],null,2))}</pre></details></div>`).join('')}</div>`;}
+function renderCalculations(items){return `<div class="cards">${(items||[]).map(c=>`<div class="card"><h4>${escapeHtml(c.calculation_id)}</h4><div class="muted">${escapeHtml(c.status)} · ${escapeHtml(c.rounding||'')}</div><p><strong>税额：</strong>${escapeHtml(typed(c.tax_amount))}<br><strong>应纳/留抵：</strong>${escapeHtml(typed(c.payable_or_credit))}</p><pre>${escapeHtml(c.formula||'')}</pre>${c.missing_fact_ids?.length?`<strong>缺失输入</strong>${list(c.missing_fact_ids)}`:''}${(c.cashflow_events||[]).map(e=>`<div class="muted">${escapeHtml(e.date)} · ${escapeHtml(e.type)} · ${escapeHtml(e.amount)}</div>`).join('')}</div>`).join('')}</div>`;}
+function scoreMap(data){return Object.fromEntries((data.scenario_scores||[]).map(x=>[x.scenario_id,x]));}
+function renderSchemes(data){const scores=scoreMap(data);return(data.schemes||[]).map((s,index)=>{const calc=(data.calculations||[])[index]||{},score=scores[`scenario-${calc.calculation_id}`]||{},components=Object.entries(score.components||{}).map(([k,v])=>`<div class="score"><strong>${escapeHtml(k)}</strong><br>${escapeHtml(v)}</div>`).join('');return `<div class="scheme"><h3>${escapeHtml(s.name)}</h3><div class="pill">综合评分 ${escapeHtml(score.total_score||'未评分')}</div><p>${escapeHtml(s.summary)}</p>${components?`<div class="score-grid">${components}</div>`:''}<strong>执行动作</strong>${list(s.actions)}<strong>预期价值</strong>${list(s.benefits)}<strong>风险边界</strong>${list(s.risks)}<strong>所需资料</strong>${list(s.required_documents)}<p><strong>税负提示：</strong>${escapeHtml(s.estimated_tax)}</p></div>`;}).join('');}
+function render(data){const review=data.human_review_required;currentCaseId=data.case_id||currentCaseId;result.innerHTML=`<div class="result-header"><div><h2>决策结果</h2><span class="pill ${review?'review':''}">${review?'必须人工审签':'可继续评估'}</span><span class="pill state">${escapeHtml(data.case_state||'stateless')}</span></div><div class="muted">案件 ${escapeHtml(data.case_id||'未持久化')}<br>${escapeHtml(data.kb_version)} · ${escapeHtml(data.verified_at)}</div></div><div class="notice ${review?'danger':''}"><strong>初步结论：</strong>${escapeHtml(data.initial_conclusion)}</div><h3>地域适用</h3><p>${escapeHtml(data.regional_application)}</p>${data.missing_facts?.length?`<h3>待补事实</h3>${list(data.missing_facts)}`:''}<div class="section"><h3>税务议题树</h3>${renderIssues(data.issues)}</div><div class="section"><h3>分组法规证据</h3>${renderEvidenceGroups(data)}</div><div class="section"><h3>检索审计轨迹</h3>${renderRetrievalTrace(data.retrieval_trace)}</div><div class="section"><h3>规则判断轨迹</h3>${renderRules(data.rule_trace)}</div><div class="section"><h3>税额计算与现金流</h3>${renderCalculations(data.calculations)}</div><div class="section"><h3>动态税务方案</h3>${renderSchemes(data)}</div><div class="section"><h3>风险提示</h3>${list(data.risks)}<p class="muted">${escapeHtml(data.disclaimer)}</p></div>`;empty.hidden=true;result.hidden=false;saveButton.disabled=false;refreshButton.disabled=!currentCaseId;auditButton.disabled=!currentCaseId;}
+async function call(path,payload,method='POST'){const options={method,headers:{'Content-Type':'application/json'}};if(payload!==undefined)options.body=JSON.stringify(payload);const response=await fetch(path,options),data=await response.json();if(!response.ok)throw new Error((data.errors||[data.error||'请求失败']).join('\n'));return data;}
+form.addEventListener('submit',async event=>{event.preventDefault();lastFacts=formData();currentCaseId='';empty.hidden=false;empty.textContent='正在拆解查询、执行混合检索、加载规则并计算…';result.hidden=true;saveButton.disabled=true;refreshButton.disabled=true;auditButton.disabled=true;try{render(await call('/api/analyze',lastFacts));}catch(error){empty.textContent=error.message;}});
+saveButton.addEventListener('click',async()=>{if(!lastFacts)return;saveButton.disabled=true;try{const data=await call('/api/save',lastFacts);render(data);alert(`案件 ${data.case_id} 已保存：${data.saved_path}`);}catch(error){alert(error.message);}finally{saveButton.disabled=false;}});
+refreshButton.addEventListener('click',async()=>{if(!currentCaseId)return;try{render(await call(`/api/cases/${currentCaseId}/analyze`,{}));}catch(error){alert(error.message);}});
+auditButton.addEventListener('click',async()=>{if(!currentCaseId)return;try{const data=await call(`/api/cases/${currentCaseId}/audit`,undefined,'GET');alert(JSON.stringify(data.events||[],null,2));}catch(error){alert(error.message);}});
 </script>
 </body>
 </html>
