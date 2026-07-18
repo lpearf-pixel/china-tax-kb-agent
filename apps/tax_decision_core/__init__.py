@@ -13,6 +13,7 @@ from .domain import (
     Scenario,
     TaxIssue,
 )
+from .fact_graph import FactGraphService, ImpactSet, MissingFact
 from .storage import CaseStorage
 
 __all__ = [
@@ -22,8 +23,11 @@ __all__ = [
     "CaseStorage",
     "Fact",
     "FactGraph",
+    "FactGraphService",
     "FactStatus",
     "FactVersion",
+    "ImpactSet",
+    "MissingFact",
     "RuleEvaluation",
     "RuleEvaluationStatus",
     "Scenario",
