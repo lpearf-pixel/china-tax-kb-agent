@@ -1,197 +1,482 @@
 from __future__ import annotations
 
-from datetime import date
+import json
+from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal
 from pathlib import Path
+from typing import Any
+from uuid import uuid4
+
+from apps.tax_decision_core.domain import (
+    CalculationResult,
+    CaseState,
+    RuleEvaluationStatus,
+)
+from apps.tax_decision_core.fact_graph import FactGraphService
+from apps.tax_decision_core.issues import IssueEngine
+from apps.tax_decision_core.rule_engine import RuleEngine
+from apps.tax_decision_core.rule_loader import RuleLoader
+from apps.tax_decision_core.scenarios import PlanningObjective, ScenarioEngine
+from apps.tax_decision_core.storage import CaseStorage
+from apps.tax_decision_core.v6_adapter import V6Adapter
+from apps.tax_decision_core.vat_calculator import CalculationContext, VatCalculator
+from apps.tax_decision_core.workflow import CaseWorkflow
 
 from .models import EvidenceItem, PlanningResult, SchemeOption, TaxFacts
 from .retrieval import EvidenceRetriever
 
-
 KB_VERSION = "KB-2026.07.17-V5-PILOT-XJ-HI"
-VERIFIED_AT = "2026-07-17"
+VERIFIED_AT = "2026-07-18"
 
 
 class TaxPlanningService:
-    def __init__(self, vault: Path):
+    def __init__(
+        self,
+        vault: Path,
+        *,
+        retriever=None,
+        rule_loader=None,
+        case_root: Path | None = None,
+    ):
         self.vault = Path(vault).resolve()
-        self.retriever = EvidenceRetriever(self.vault)
+        self.retriever = retriever or EvidenceRetriever(self.vault)
+        self.rule_loader = rule_loader or RuleLoader(
+            self.vault / "rules",
+            vault=self.vault,
+        )
+        self.adapter = V6Adapter()
+        self.issue_engine = IssueEngine()
+        self.rule_engine = RuleEngine()
+        self.calculator = VatCalculator()
+        self.scenario_engine = ScenarioEngine()
+        self.storage = CaseStorage(case_root or self.vault / "cases")
+        self.fact_service = FactGraphService(self.storage)
+        self.workflow = CaseWorkflow(self.storage)
+
+    def _evidence(self, facts: TaxFacts) -> list[EvidenceItem]:
+        return list(self.retriever.search(facts, top_k=8))
 
     @staticmethod
-    def _date_between(raw: str, start: str, end: str) -> bool:
-        value = date.fromisoformat(raw)
-        return date.fromisoformat(start) <= value <= date.fromisoformat(end)
+    def _selected(bundle, group: str):
+        return bundle.selected.get(group)
 
-    def _threshold_conclusion(self, facts: TaxFacts) -> tuple[str, bool]:
-        if facts.vat_status != "小规模纳税人" or not self._date_between(facts.business_date, "2026-01-01", "2027-12-31"):
-            return "尚不能直接适用2026—2027年小规模纳税人起征点结论。", False
-        threshold = {"月": 100000, "季度": 300000, "单次": 1000}.get(facts.amount_period)
-        if threshold is None or facts.amount is None:
-            return "需要根据实际计税期间进一步判断起征点。", False
-        period_name = {"月": "月10万元", "季度": "季度30万元", "单次": "每次（日）1000元"}[facts.amount_period]
-        if facts.amount <= threshold:
-            return (
-                f"在已提供事实下，销售额未超过{period_name}起征点，初步具备进入增值税免税判断的条件；"
-                "仍需合并同一计税期间全部应税交易，并确认是否放弃免税开具专用发票。",
-                True,
-            )
-        return f"当前销售额超过{period_name}起征点，不能仅依起征点免税，需要继续判断适用征收率和其他优惠。", False
-
-    def _regional_application(self, facts: TaxFacts) -> str:
-        if facts.region == "CN-XJ":
-            return "新疆事项采用全国增值税规则底座，并叠加新疆正式地方文件或执行口径；地方解读不得推翻上位法。"
-        if facts.region == "CN-HI":
-            special = facts.hainan_special_scene or facts.transaction_type == "进口货物" or facts.cross_border
-            if special:
-                return (
-                    "该事项可能进入海南自贸港特殊政策门禁，必须核验业务日期、享惠主体、HS编码、商品目录、"
-                    "一线/二线流向、用途和监管资料，不能仅因注册地在海南认定零关税。"
-                )
-            return "该事项属于海南普通境内服务或交易，先适用全国增值税规则，不因注册在海南而自动适用零关税。"
-        return "适用全国税收法规，不叠加新疆或海南地域覆盖层。"
-
-    def _risk_flags(self, facts: TaxFacts, missing: list[str]) -> tuple[list[str], bool]:
-        risks: list[str] = []
-        review = False
-        if facts.related_party:
-            risks.append("存在关联交易或关联主体分拆信号，需核对人员、资产、业务、合同、资金流和定价合理性。")
-            review = True
-        if "分拆" in facts.description:
-            risks.append("不得通过人为分拆主体、合同、收入或发票规避起征点或一般纳税人登记。")
-            review = True
-        flags = [
-            (facts.cross_border, "涉及跨境交易，应核验扣缴、进口环节税费、常设机构或海关规则。"),
-            (facts.historical_tax, "涉及历史补税，应按业务发生时点适用当期法规并保留历史版本证据。"),
-            (facts.real_estate or facts.transaction_type == "不动产", "涉及不动产，不能直接套用小规模3%减按1%政策。"),
-            (facts.restructuring, "涉及企业重组，需联动企业所得税、增值税、契税、印花税等多税种复核。"),
-            (facts.tax_audit, "涉及稽查、处罚或争议，必须由专业人员审阅完整证据。"),
-        ]
-        for active, message in flags:
-            if active:
-                risks.append(message)
-                review = True
-        hainan_gate = facts.region == "CN-HI" and (
-            facts.hainan_special_scene or facts.transaction_type == "进口货物" or facts.cross_border
+    def _calculations(self, facts: TaxFacts, bundle) -> list[CalculationResult]:
+        threshold = self._selected(bundle, "vat_threshold")
+        threshold_ok = bool(
+            threshold
+            and threshold.status == RuleEvaluationStatus.APPLICABLE
+            and threshold.outcome == "threshold_exempt_candidate"
+            and threshold.value is True
         )
-        if hainan_gate:
-            review = True
-            if missing:
-                risks.append("海南特殊政策关键资料缺失，当前不得确定可适用零关税或其他自贸港优惠。")
-            else:
-                risks.append("海南享惠主体、商品编码和流向属于高风险认定事项，仍需人工审签。")
-        return risks, review
-
-    def _schemes(self, facts: TaxFacts, threshold_ok: bool, missing: list[str]) -> list[SchemeOption]:
-        within_temp_policy = self._date_between(facts.business_date, "2026-01-01", "2027-12-31")
-        non_property = facts.transaction_type in {"服务", "货物", "无形资产", "其他"}
-        one_percent = facts.vat_status == "小规模纳税人" and within_temp_policy and non_property
-
-        hainan_gate = facts.region == "CN-HI" and (
-            facts.hainan_special_scene or facts.transaction_type == "进口货物" or facts.cross_border
+        rate_evaluation = self._selected(bundle, "vat_levy_rate")
+        hainan_special = facts.region == "CN-HI" and (
+            facts.hainan_special_scene
+            or facts.transaction_type == "进口货物"
+            or facts.cross_border
         )
-        if hainan_gate:
+        if hainan_special or (
+            rate_evaluation and rate_evaluation.outcome == "levy_rate_excluded"
+        ):
             return [
-                SchemeOption(
-                    name="方案A｜普通税制合规基线",
-                    summary="在海南特殊资格尚未确认前，按正常进口或境内税制建立保守预算，不提前把零关税计入报价。",
-                    actions=["确认交易路径和报关主体", "按普通税制测算税费上限", "将优惠作为审批通过后的敏感性情景"],
-                    benefits=["避免优惠落空导致补税和现金流缺口", "报价和合同更稳健"],
-                    risks=["税负预算较高，但属于保守基线"],
-                    required_documents=["进口合同", "商品说明", "付款与物流安排"],
-                ),
-                SchemeOption(
-                    name="方案B｜海南特殊政策资格预审",
-                    summary="补齐HS编码、享惠主体、商品目录和一线/二线流向后，再判断零关税或加工增值政策。",
-                    actions=["完成商品归类", "核验享惠主体资格", "核对进口征税目录及贸易救济", "形成用途和后续处置闭环"],
-                    benefits=["在合法条件满足时降低进口环节税负", "形成可供海关和税务核验的证据链"],
-                    risks=["资格和编码认定不确定", "资料或实际流向不符可能被追税"],
-                    required_documents=["HS编码归类资料", "享惠主体证明", "报关单", "物流和用途台账"] + missing,
-                ),
-                SchemeOption(
-                    name="方案C｜交易与现金流分阶段安排",
-                    summary="在真实业务不变的前提下，按审批、进口、生产或销售节点安排合同付款和税费预算。",
-                    actions=["设置优惠获批前后两套现金流情景", "合同中明确税费承担和政策变化条款", "重大进口前完成书面专业复核"],
-                    benefits=["降低政策认定时间差造成的现金流压力", "避免合同税费承担不清"],
-                    risks=["不得虚构流向或改变报关事实", "合同安排不能替代政策资格"],
-                    required_documents=["交易流程图", "合同草案", "现金流测算", "审签记录"],
-                ),
+                CalculationResult(
+                    calculation_id="calc-baseline",
+                    status="unable_to_calculate",
+                    tax_type="增值税",
+                    inputs={
+                        "scenario_name": "普通税制保守基线",
+                        "decision_variables": {},
+                    },
+                    missing_fact_ids=facts.missing_facts()
+                    or ["applicable_levy_rate"],
+                )
             ]
 
-        baseline_summary = (
-            "以当前主体和真实交易为基线，核对同一计税期间全部销售额并依法申报。"
-            + ("初步可按起征点免税方向处理。" if threshold_ok else "当前不能仅依起征点免税。")
+        levy_rate = (
+            Decimal(str(rate_evaluation.value))
+            if rate_evaluation and rate_evaluation.outcome == "levy_rate"
+            else (
+                Decimal(str(facts.extra.get("original_levy_rate", "0.03")))
+                if facts.vat_status == "小规模纳税人"
+                else None
+            )
         )
-        invoice_summary = (
-            "普通发票需求下优先保留起征点优惠并做好销售额台账。"
-            if facts.invoice_need != "专用发票"
-            else "评估客户专票需求与放弃免税的税负、报价和现金流影响，按实际选择开票。"
-        )
-        rate_summary = (
-            "超过起征点或放弃免税时，符合条件的3%征收率交易可评估2026—2027年减按1%。"
-            if one_percent else
-            "根据交易性质和纳税人身份重新确定税率或征收率，不预设1%优惠。"
-        )
-        return [
-            SchemeOption(
-                name="方案A｜合规基线",
-                summary=baseline_summary,
-                actions=["核对全部应税交易销售额", "确认计税期间", "保存合同、发票、收款和申报记录"],
-                benefits=["执行路径简单", "争议风险最低"],
-                risks=["遗漏其他销售额会导致起征点判断错误"],
-                required_documents=["销售台账", "合同", "发票清单", "申报表"],
-                estimated_tax="达到起征点条件且未放弃免税时，初步增值税为0；最终以完整销售额和申报为准" if threshold_ok else "需按适用征收率和完整计税依据测算",
-            ),
-            SchemeOption(
-                name="方案B｜发票与申报协同",
-                summary=invoice_summary + rate_summary,
-                actions=["向客户确认发票类型", "对比免税与开专票后的报价", "确保发票征收率与申报一致"],
-                benefits=["兼顾客户需求和现金流", "避免发票与申报不一致"],
-                risks=["放弃免税可能增加税负", "不得为取得专票收益虚构交易"],
-                required_documents=["客户发票要求", "报价单", "开票记录", "申报测算"],
-            ),
-            SchemeOption(
-                name="方案C｜纳税人身份与增长评估",
-                summary="结合未来12个月销售额、进项结构和客户专票需求，评估继续小规模或依法登记一般纳税人的边界。",
-                actions=["预测连续12个月/4季度销售额", "测算可抵扣进项", "比较小规模与一般纳税人综合成本"],
-                benefits=["提前管理超过500万元登记风险", "为业务增长和报价留出空间"],
-                risks=["不得人为分拆关联主体规避登记", "身份转换影响开票、进项和内部管理"],
-                required_documents=["销售预测", "进项发票结构", "客户结构", "主体关联关系图"],
-            ),
+        payment_due = date.fromisoformat(facts.business_date) + timedelta(days=30)
+        applicable_rule_ids = [
+            evaluation.rule_id
+            for evaluation in bundle.evaluations
+            if evaluation.status == RuleEvaluationStatus.APPLICABLE
         ]
 
-    def analyze(self, facts: TaxFacts) -> PlanningResult:
+        baseline = self.calculator.calculate(
+            CalculationContext(
+                calculation_id="calc-baseline",
+                taxpayer_status=facts.vat_status,
+                amount=facts.amount,
+                amount_tax_inclusive=facts.amount_tax_inclusive,
+                levy_rate=levy_rate,
+                threshold_exempt_candidate=threshold_ok,
+                waive_exemption=False,
+                invoice_type="普通发票",
+                payment_due_date=payment_due,
+                rule_ids=applicable_rule_ids,
+            )
+        )
+        baseline.inputs.update(
+            {
+                "scenario_name": "合规基线",
+                "decision_variables": {
+                    "invoice_type": "普通发票",
+                    "waive_exemption": False,
+                },
+            }
+        )
+
+        invoice = self.calculator.calculate(
+            CalculationContext(
+                calculation_id="calc-invoice",
+                taxpayer_status=facts.vat_status,
+                amount=facts.amount,
+                amount_tax_inclusive=facts.amount_tax_inclusive,
+                levy_rate=levy_rate,
+                threshold_exempt_candidate=threshold_ok,
+                waive_exemption=True,
+                invoice_type="专用发票",
+                payment_due_date=payment_due,
+                rule_ids=applicable_rule_ids,
+            )
+        )
+        invoice.inputs.update(
+            {
+                "scenario_name": "发票与申报协同",
+                "decision_variables": {
+                    "invoice_type": "专用发票",
+                    "waive_exemption": True,
+                },
+            }
+        )
+
+        growth = CalculationResult(
+            calculation_id="calc-growth",
+            status="conditional_determinate",
+            tax_type="增值税",
+            taxable_amount=baseline.taxable_amount,
+            tax_amount=baseline.tax_amount,
+            payable_or_credit=baseline.payable_or_credit,
+            formula=(
+                "基于当前身份的增长敏感性基线；登记一般纳税人后需补充"
+                "进项结构和具体适用税率。"
+            ),
+            inputs={
+                "scenario_name": "纳税人身份与增长评估",
+                "decision_variables": {"voluntary_general_taxpayer": True},
+            },
+            rule_ids=applicable_rule_ids,
+        )
+        return [baseline, invoice, growth]
+
+    def _run(self, facts: TaxFacts, case_id: str | None = None):
         errors = facts.validate()
         if errors:
             raise ValueError("; ".join(errors))
-        missing = facts.missing_facts()
-        evidence: list[EvidenceItem] = self.retriever.search(facts, top_k=8)
-        initial, threshold_ok = self._threshold_conclusion(facts)
-        regional = self._regional_application(facts)
-        risks, review = self._risk_flags(facts, missing)
-        if facts.region == "CN-HI" and (
-            facts.hainan_special_scene or facts.transaction_type == "进口货物" or facts.cross_border
-        ) and missing:
-            initial = "海南自贸港特殊政策关键事实不足，目前不能确定零关税或其他优惠是否适用。"
-        if not evidence:
-            risks.append("未检索到足够的A级有效法规证据，当前结论只能作为事实采集草案。")
-            review = True
-        conditions = [
-            f"地区：{facts.region}", f"纳税人类型：{facts.taxpayer_type}", f"增值税身份：{facts.vat_status}",
-            f"业务时间：{facts.business_date}", f"交易类型：{facts.transaction_type}",
-            f"金额及期间：{facts.amount} / {facts.amount_period}", f"发票需求：{facts.invoice_need}",
-        ]
+        case, graph = self.adapter.to_v7(facts, case_id)
+        valid_on = date.fromisoformat(facts.business_date)
+        rules = self.rule_loader.load(valid_on, facts.region, "增值税")
+        bundle = self.rule_engine.evaluate_all(rules, graph, valid_on)
+        issues = self.issue_engine.identify(case, graph)
+        calculations = self._calculations(facts, bundle)
+        scenarios = self.scenario_engine.generate(
+            case,
+            issues,
+            bundle.evaluations + bundle.conflicts,
+            calculations,
+        )
+        objective = PlanningObjective(
+            desired_invoice_type=(
+                facts.invoice_need
+                if facts.invoice_need in {"普通发票", "专用发票"}
+                else ""
+            )
+        )
+        scores = self.scenario_engine.rank(scenarios, objective)
+        evidence = self._evidence(facts)
+        return case, graph, bundle, issues, calculations, scenarios, scores, evidence
+
+    def _result(
+        self,
+        facts: TaxFacts,
+        case,
+        graph,
+        bundle,
+        issues,
+        calculations,
+        scenarios,
+        scores,
+        evidence,
+    ) -> PlanningResult:
+        threshold = self._selected(bundle, "vat_threshold")
+        threshold_ok = bool(
+            threshold and threshold.status == RuleEvaluationStatus.APPLICABLE
+        )
+        hainan_special = facts.region == "CN-HI" and (
+            facts.hainan_special_scene
+            or facts.transaction_type == "进口货物"
+            or facts.cross_border
+        )
+        if hainan_special:
+            initial = (
+                "海南自贸港特殊政策关键事实不足，目前不能确定零关税或"
+                "其他优惠是否适用。"
+            )
+        elif threshold_ok:
+            threshold_name = {
+                "月": "月10万元",
+                "季度": "季度30万元",
+                "单次": "每次（日）1000元",
+            }.get(facts.amount_period, "起征点")
+            initial = (
+                f"{threshold_name}起征点条件已由规则引擎初步命中；"
+                "仍需确认同期间全部销售额和是否放弃免税。"
+            )
+        else:
+            initial = "当前未命中起征点候选，需按规则结果和适用征收率继续计算。"
+
+        if facts.region == "CN-XJ":
+            regional = "新疆事项采用全国规则底座并叠加新疆覆盖层。"
+        elif facts.region == "CN-HI" and not hainan_special:
+            regional = (
+                "该事项属于海南普通境内服务或交易，先适用全国增值税规则，"
+                "不因注册在海南而自动适用零关税。"
+            )
+        elif facts.region == "CN-HI":
+            regional = (
+                "该事项进入海南特殊政策门禁，享惠主体、HS编码、流向和用途"
+                "必须人工复核。"
+            )
+        else:
+            regional = "适用全国税收法规。"
+
+        schemes: list[SchemeOption] = []
+        for scenario, calculation in zip(scenarios, calculations):
+            summary = calculation.formula or "需要补齐资料后计算。"
+            if (
+                calculation.inputs.get("levy_rate") == Decimal("0.01")
+                or "0.01" in summary
+            ):
+                summary += "；符合条件时体现1%征收率方向。"
+            schemes.append(
+                SchemeOption(
+                    name=scenario.name,
+                    summary=summary,
+                    actions=[
+                        "确认事实和规则命中",
+                        "核对发票、申报和付款时间",
+                        "正式执行前保存完整资料链",
+                    ],
+                    benefits=["税额和现金流可追溯", "评分构成透明"],
+                    risks=list(scenario.risks),
+                    required_documents=list(scenario.required_documents),
+                    estimated_tax=(
+                        str(scenario.total_tax)
+                        if scenario.total_tax is not None
+                        else "无法确定"
+                    ),
+                )
+            )
+
+        risks = list(dict.fromkeys(risk for item in scenarios for risk in item.risks))
+        missing = list(
+            dict.fromkeys(
+                facts.missing_facts()
+                + [missing_id for issue in issues for missing_id in issue.missing_fact_ids]
+            )
+        )
+        review = any(item.human_review_required for item in scenarios) or bool(
+            bundle.conflicts
+        )
         return PlanningResult(
             initial_conclusion=initial,
-            applicable_conditions=conditions,
+            applicable_conditions=[
+                f"地区：{facts.region}",
+                f"纳税人类型：{facts.taxpayer_type}",
+                f"增值税身份：{facts.vat_status}",
+                f"业务时间：{facts.business_date}",
+                f"交易类型：{facts.transaction_type}",
+            ],
             evidence=evidence,
-            explanation=(
-                "系统先用业务日期、地域和主体身份过滤法规，再检索A级条款。方案是基于当前事实的合法合规选择，"
-                "不是通过改变真实交易或分拆收入制造税收结果。"
-            ),
+            explanation="系统已通过事实图谱、规则引擎和Decimal计算器生成结果。",
             regional_application=regional,
-            schemes=self._schemes(facts, threshold_ok, missing),
+            schemes=schemes,
             risks=risks,
             missing_facts=missing,
             human_review_required=review,
             kb_version=KB_VERSION,
             verified_at=VERIFIED_AT,
+            case_id=case.case_id,
+            case_state=case.state.value,
+            issues=[issue.to_dict() for issue in issues],
+            rule_trace=[
+                evaluation.to_dict()
+                for evaluation in bundle.evaluations + bundle.conflicts
+            ],
+            calculations=[calculation.to_dict() for calculation in calculations],
+            scenario_scores=[
+                {
+                    "scenario_id": score.scenario_id,
+                    "total_score": str(score.total_score),
+                    "components": {
+                        key: str(value) for key, value in score.components.items()
+                    },
+                }
+                for score in scores
+            ],
         )
+
+    def analyze(
+        self,
+        facts: TaxFacts,
+        *,
+        case_id: str | None = None,
+    ) -> PlanningResult:
+        artifacts = self._run(facts, case_id)
+        return self._result(facts, *artifacts)
+
+    def _next_version(self, case_id: str, kind: str) -> int:
+        try:
+            return self.storage.latest_version(case_id, kind) + 1
+        except FileNotFoundError:
+            return 1
+
+    def _persist(self, artifacts, result: PlanningResult, *, create: bool) -> PlanningResult:
+        case, graph, bundle, issues, calculations, scenarios, scores, evidence = artifacts
+        if create:
+            self.storage.create(case)
+            self.storage.write_version(case.case_id, "facts", 1, graph.to_dict())
+
+        payloads = (
+            ("issues", {"issues": [item.to_dict() for item in issues]}),
+            ("evidence", {"items": [item.to_dict() for item in evidence]}),
+            (
+                "decisions",
+                {
+                    "evaluations": [
+                        item.to_dict()
+                        for item in bundle.evaluations + bundle.conflicts
+                    ]
+                },
+            ),
+            (
+                "calculations",
+                {"calculations": [item.to_dict() for item in calculations]},
+            ),
+            (
+                "scenarios",
+                {
+                    "scenarios": [item.to_dict() for item in scenarios],
+                    "scores": result.scenario_scores,
+                },
+            ),
+        )
+        for kind, payload in payloads:
+            self.storage.write_version(
+                case.case_id,
+                kind,
+                self._next_version(case.case_id, kind),
+                payload,
+            )
+
+        saved = self.storage.load(case.case_id)
+        saved.issues_version = self.storage.latest_version(case.case_id, "issues")
+        saved.calculations_version = self.storage.latest_version(
+            case.case_id, "calculations"
+        )
+        saved.scenarios_version = self.storage.latest_version(case.case_id, "scenarios")
+        saved.state = (
+            CaseState.HUMAN_REVIEW_PENDING
+            if result.human_review_required
+            else CaseState.SCENARIOS_READY
+        )
+        saved.updated_at = datetime.now(timezone.utc)
+        self.storage.update_case(saved)
+        result.case_state = saved.state.value
+        self.storage.append_event(
+            case.case_id,
+            {
+                "event": "analysis_persisted",
+                "at": saved.updated_at.isoformat(),
+                "facts_version": saved.facts_version,
+                "issues_version": saved.issues_version,
+                "calculations_version": saved.calculations_version,
+                "scenarios_version": saved.scenarios_version,
+            },
+        )
+        return result
+
+    def create_case(self, facts: TaxFacts) -> PlanningResult:
+        case_id = (
+            f"case-{datetime.now().strftime('%Y%m%d%H%M%S')}-"
+            f"{uuid4().hex[:6]}"
+        )
+        artifacts = self._run(facts, case_id)
+        result = self._result(facts, *artifacts)
+        return self._persist(artifacts, result, create=True)
+
+    def analyze_case(self, case_id: str) -> PlanningResult:
+        graph = self.fact_service.load_graph(case_id)
+        facts = self.adapter.from_graph(graph)
+        artifacts = self._run(facts, case_id)
+        result = self._result(facts, *artifacts)
+        return self._persist(artifacts, result, create=False)
+
+    def get_case(self, case_id: str) -> dict[str, Any]:
+        case = self.storage.load(case_id)
+        payload: dict[str, Any] = {
+            "case": case.to_dict(),
+            "facts": self.fact_service.load_graph(case_id).to_dict(),
+        }
+        for kind in ("issues", "evidence", "decisions", "calculations", "scenarios"):
+            try:
+                payload[kind] = self.storage.load_version(
+                    case_id,
+                    kind,
+                    self.storage.latest_version(case_id, kind),
+                )
+            except FileNotFoundError:
+                payload[kind] = None
+        return payload
+
+    def revise_case_fact(
+        self,
+        case_id: str,
+        fact_id: str,
+        value: Any,
+        actor: str = "user",
+    ) -> dict[str, Any]:
+        impact = self.fact_service.revise_fact(case_id, fact_id, value, actor)
+        rerun = self.workflow.replay_affected(case_id, impact.affected_nodes)
+        return {
+            "fact_id": fact_id,
+            "new_version": impact.new_version,
+            "affected_nodes": list(impact.affected_nodes),
+            "rerun_nodes": list(rerun),
+            "case_state": self.storage.load(case_id).state.value,
+        }
+
+    def review_case(
+        self,
+        case_id: str,
+        approved: bool,
+        actor: str,
+        note: str = "",
+    ) -> dict[str, str]:
+        state = self.workflow.record_review(case_id, approved, actor, note)
+        return {"case_id": case_id, "state": state.value}
+
+    def audit_case(self, case_id: str) -> list[dict[str, Any]]:
+        path = self.storage.root / case_id / "timeline.jsonl"
+        if not path.exists():
+            return []
+        return [
+            json.loads(line)
+            for line in path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
