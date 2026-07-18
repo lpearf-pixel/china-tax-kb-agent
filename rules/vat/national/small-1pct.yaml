@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "status": "effective",
+  "tax_type": "增值税",
+  "tags": ["V7", "deterministic"],
+  "rule_id": "VAT-SMALL-1PCT-2026",
+  "valid_from": "2026-01-01",
+  "valid_to": "2027-12-31",
+  "jurisdiction": "CN",
+  "priority": 100,
+  "exclusive_group": "vat_levy_rate",
+  "description": "符合条件的小规模3%征收率减按1%",
+  "when": {"all": [
+    {"fact": "taxpayer.vat_status", "operator": "equals", "value": "小规模纳税人"},
+    {"fact": "transaction.original_levy_rate", "operator": "equals", "value": 0.03},
+    {"fact": "transaction.transaction_type", "operator": "not_in", "value": ["销售不动产", "出租不动产", "转让土地使用权", "不动产"]}
+  ]},
+  "then": {"outcome": "levy_rate", "value": 0.01, "confidence": "deterministic"},
+  "requires": ["transaction.transaction_type", "transaction.original_levy_rate"],
+  "legal_basis": [{"document_id": "DOC-CN-VAT-MOF-STA-2026-10", "provision_id": "PROV-VAT-ANN10-3TO1"}]
+}
