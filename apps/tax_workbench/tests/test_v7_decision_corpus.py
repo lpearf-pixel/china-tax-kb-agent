@@ -50,7 +50,10 @@ class V7DecisionCorpusTests(unittest.TestCase):
                 facts = TaxFacts.from_dict(item["facts"])
                 result = self.service.analyze(facts)
                 expected = item.get("expected", {})
-                rule_ids = {entry.get("rule_id") for entry in result.rule_trace}
+                evaluations = {
+                    entry.get("rule_id"): entry for entry in result.rule_trace
+                }
+                rule_ids = set(evaluations)
                 issue_ids = {entry.get("issue_id") for entry in result.issues}
 
                 if expected.get("rule"):
@@ -60,9 +63,21 @@ class V7DecisionCorpusTests(unittest.TestCase):
                 if expected.get("issue"):
                     self.assertIn(expected["issue"], issue_ids)
                 if "review" in expected:
-                    self.assertEqual(result.human_review_required, expected["review"])
+                    self.assertEqual(
+                        result.human_review_required,
+                        expected["review"],
+                    )
+                if expected.get("review_or_missing"):
+                    self.assertTrue(
+                        result.human_review_required or bool(result.missing_facts)
+                    )
                 if expected.get("missing"):
                     self.assertIn(expected["missing"], result.missing_facts)
+                if expected.get("levy_rate") and expected.get("rule"):
+                    self.assertEqual(
+                        decoded(evaluations[expected["rule"]].get("value")),
+                        Decimal(expected["levy_rate"]),
+                    )
                 if expected.get("calculation_status"):
                     self.assertEqual(
                         result.calculations[0]["status"],
@@ -83,9 +98,14 @@ class V7DecisionCorpusTests(unittest.TestCase):
                         decoded(entry.get("tax_amount"))
                         for entry in result.calculations
                     ]
-                    self.assertTrue(any(value is not None and value > 0 for value in amounts))
+                    self.assertTrue(
+                        any(value is not None and value > 0 for value in amounts)
+                    )
                 if expected.get("scenario"):
-                    self.assertIn(expected["scenario"], {scheme.name for scheme in result.schemes})
+                    self.assertIn(
+                        expected["scenario"],
+                        {scheme.name for scheme in result.schemes},
+                    )
                 if expected.get("report_sections"):
                     report = render_markdown(facts, result)
                     for section in expected["report_sections"]:
