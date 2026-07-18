@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "status": "effective",
+  "tax_type": "增值税",
+  "tags": ["V7", "deterministic"],
+  "rule_id": "HI-VAT-ORDINARY-DOMESTIC-FALLBACK",
+  "valid_from": "2026-01-01",
+  "valid_to": null,
+  "jurisdiction": "CN-HI",
+  "priority": 120,
+  "exclusive_group": "hainan_policy_route",
+  "description": "海南普通境内业务回落全国增值税规则",
+  "when": {"all": [
+    {"fact": "region.code", "operator": "equals", "value": "CN-HI"},
+    {"not": {"fact": "hainan.special_scene", "operator": "equals", "value": true}},
+    {"fact": "transaction.transaction_type", "operator": "not_equals", "value": "进口货物"}
+  ]},
+  "then": {"outcome": "use_national_vat_rules", "value": true, "confidence": "deterministic"},
+  "requires": ["region.code", "hainan.special_scene", "transaction.transaction_type"],
+  "legal_basis": [{"document_id": "DOC-CN-VAT-LAW-2024", "provision_id": "PROV-VAT-LAW-003"}]
+}
