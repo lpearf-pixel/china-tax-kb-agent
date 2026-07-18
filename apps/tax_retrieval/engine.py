@@ -33,11 +33,24 @@ class HybridRetrievalEngine:
         from taxkb_core import bm25_rank, chunk_markdown, filter_docs, iter_markdown, select_note_for_profile
         return bm25_rank, chunk_markdown, filter_docs, iter_markdown, select_note_for_profile
 
+    def _index_is_fresh(self, chunks: Path) -> bool:
+        if not chunks.exists():
+            return False
+        roots = ("01-法规原文", "02-条款结构", "03-概念解释", "04-税种知识", "05-纳税人类型", "06-业务场景", "07-政策效力与关系", "08-税务规划案例", "09-风险与争议", "13-Workflow", "14-Agent提示词", "15-人工审签")
+        latest = 0.0
+        for name in roots:
+            root = self.vault / name
+            if not root.exists():
+                continue
+            for note in root.rglob("*.md"):
+                latest = max(latest, note.stat().st_mtime)
+        return chunks.stat().st_mtime >= latest
+
     def load_docs(self) -> list[dict]:
         if self._docs is not None:
             return self._docs
         chunks = self.vault / "90-工具/output/chunks.jsonl"
-        if chunks.exists():
+        if self._index_is_fresh(chunks):
             self._docs = [json.loads(line) for line in chunks.read_text(encoding="utf-8").splitlines() if line.strip()]
             return self._docs
         _, chunk_markdown, _, iter_markdown, select_note_for_profile = self._tools()
