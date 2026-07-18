@@ -7,14 +7,30 @@ from typing import Any
 from .domain import CaseRecord, CaseState, Fact, FactGraph, FactStatus, FactVersion
 from .storage import CaseStorage
 
-
 ALLOWED_NODE_TYPES = {
-    "Party", "TaxRegistration", "Transaction", "Contract", "InvoiceFlow",
-    "CashFlow", "GoodsFlow", "ServiceFlow", "Asset", "Relationship", "EvidenceDocument",
+    "Party",
+    "TaxRegistration",
+    "Transaction",
+    "Contract",
+    "InvoiceFlow",
+    "CashFlow",
+    "GoodsFlow",
+    "ServiceFlow",
+    "Asset",
+    "Relationship",
+    "EvidenceDocument",
 }
 ALLOWED_RELATIONS = {
-    "signs", "governs", "has_invoice_flow", "has_cash_flow", "has_goods_flow",
-    "has_service_flow", "controls", "relates_to", "owns", "supports",
+    "signs",
+    "governs",
+    "has_invoice_flow",
+    "has_cash_flow",
+    "has_goods_flow",
+    "has_service_flow",
+    "controls",
+    "relates_to",
+    "owns",
+    "supports",
 }
 
 
@@ -60,7 +76,9 @@ class FactGraphService:
         return result
 
     @staticmethod
-    def _validate_edges(edges: list[dict[str, Any]], nodes: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+    def _validate_edges(
+        edges: list[dict[str, Any]], nodes: dict[str, dict[str, Any]]
+    ) -> list[dict[str, Any]]:
         result: list[dict[str, Any]] = []
         for raw in edges:
             source = str(raw.get("source") or "")
@@ -116,7 +134,10 @@ class FactGraphService:
         )
         self.storage.create(case)
         self.storage.write_version(case_id, "facts", 1, graph.to_dict())
-        self.storage.append_event(case_id, {"event": "case_created", "at": now.isoformat(), "facts_version": 1})
+        self.storage.append_event(
+            case_id,
+            {"event": "case_created", "at": now.isoformat(), "facts_version": 1},
+        )
         return case
 
     def load_graph(self, case_id: str, version: int | None = None) -> FactGraph:
@@ -133,16 +154,48 @@ class FactGraphService:
     @staticmethod
     def _affected_nodes(fact_id: str) -> tuple[str, ...]:
         if fact_id == "transaction.business_date":
-            return ("evidence", "rules", "calculation", "scenarios")
-        if fact_id.startswith(("invoice.", "transaction.")):
+            return ("issues", "evidence", "rules", "calculation", "scenarios")
+        if fact_id.startswith("invoice."):
             return ("rules", "calculation", "scenarios")
-        if fact_id.startswith("goods_flow."):
-            return ("issues", "evidence", "rules", "calculation", "scenarios", "human_review")
+        if fact_id in {"transaction.related_party", "transaction.split_signal"}:
+            return ("issues", "rules", "calculation", "scenarios", "human_review")
+        if fact_id in {
+            "transaction.transaction_type",
+            "transaction.cross_border",
+        }:
+            return (
+                "issues",
+                "evidence",
+                "rules",
+                "calculation",
+                "scenarios",
+                "human_review",
+            )
+        if fact_id.startswith("transaction."):
+            return ("rules", "calculation", "scenarios")
+        if fact_id.startswith(("goods_flow.", "hainan.")):
+            return (
+                "issues",
+                "evidence",
+                "rules",
+                "calculation",
+                "scenarios",
+                "human_review",
+            )
         if fact_id.startswith(("taxpayer.", "region.")):
             return ("issues", "evidence", "rules", "calculation", "scenarios")
+        if fact_id.startswith("risk."):
+            return ("issues", "rules", "calculation", "scenarios", "human_review")
         return ("issues", "evidence", "rules", "calculation", "scenarios")
 
-    def _new_version(self, case_id: str, fact_id: str, value: Any, actor: str, status: FactStatus) -> tuple[FactVersion, ImpactSet]:
+    def _new_version(
+        self,
+        case_id: str,
+        fact_id: str,
+        value: Any,
+        actor: str,
+        status: FactStatus,
+    ) -> tuple[FactVersion, ImpactSet]:
         case = self.storage.load(case_id)
         graph = self.load_graph(case_id, case.facts_version)
         fact = graph.facts.get(fact_id)
@@ -183,20 +236,27 @@ class FactGraphService:
         case.updated_at = now
         self.storage.update_case(case)
         affected = self._affected_nodes(fact_id)
-        self.storage.append_event(case_id, {
-            "event": "fact_revised" if old_version else "fact_added",
-            "at": now.isoformat(),
-            "fact_id": fact_id,
-            "old_version": old_version,
-            "new_version": next_fact_version,
-            "affected_nodes": list(affected),
-        })
+        self.storage.append_event(
+            case_id,
+            {
+                "event": "fact_revised" if old_version else "fact_added",
+                "at": now.isoformat(),
+                "fact_id": fact_id,
+                "old_version": old_version,
+                "new_version": next_fact_version,
+                "affected_nodes": list(affected),
+            },
+        )
         return created, ImpactSet(fact_id, old_version, next_fact_version, affected)
 
     def confirm_fact(self, case_id: str, fact_id: str, value: Any, actor: str) -> FactVersion:
-        created, _ = self._new_version(case_id, fact_id, value, actor, FactStatus.CONFIRMED)
+        created, _ = self._new_version(
+            case_id, fact_id, value, actor, FactStatus.CONFIRMED
+        )
         return created
 
     def revise_fact(self, case_id: str, fact_id: str, value: Any, actor: str) -> ImpactSet:
-        _, impact = self._new_version(case_id, fact_id, value, actor, FactStatus.CONFIRMED)
+        _, impact = self._new_version(
+            case_id, fact_id, value, actor, FactStatus.CONFIRMED
+        )
         return impact
