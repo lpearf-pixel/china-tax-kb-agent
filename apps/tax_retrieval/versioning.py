@@ -15,6 +15,10 @@ def _parse_date(value: Any) -> date | None:
         return None
 
 
+def _start(row: RetrievalCandidate) -> date:
+    return _parse_date(row.metadata.get("provision_valid_from")) or _parse_date(row.metadata.get("effective_date")) or date.min
+
+
 class VersionResolver:
     def resolve(self, candidates: list[RetrievalCandidate], valid_on: str | date, historical_requested: bool) -> list[RetrievalCandidate]:
         target = valid_on if isinstance(valid_on, date) else date.fromisoformat(str(valid_on))
@@ -24,8 +28,8 @@ class VersionResolver:
             key = candidate.provision_id or candidate.document_id
             if not key:
                 passthrough.append(candidate)
-                continue
-            groups.setdefault(key, []).append(candidate)
+            else:
+                groups.setdefault(key, []).append(candidate)
         selected = list(passthrough)
         for rows in groups.values():
             eligible: list[RetrievalCandidate] = []
@@ -36,14 +40,9 @@ class VersionResolver:
                 start = _parse_date(meta.get("provision_valid_from")) or _parse_date(meta.get("effective_date"))
                 end = _parse_date(meta.get("provision_valid_to")) or _parse_date(meta.get("expiry_date"))
                 valid = (start is None or start <= target) and (end is None or target <= end) and status not in {"repealed", "expired", "已废止", "失效"}
-                if valid:
-                    eligible.append(row)
-                else:
-                    historical.append(row)
-            if eligible:
-                eligible.sort(key=lambda row: (_parse_date(row.metadata.get("provision_valid_from")) or _parse_date(row.metadata.get("effective_date")) or date.min, row.rrf_score), reverse=True)
-                selected.append(eligible[0])
-            elif historical_requested and historical:
-                historical.sort(key=lambda row: row.rrf_score, reverse=True)
-                selected.append(historical[0])
+                (eligible if valid else historical).append(row)
+            chosen = eligible if eligible else historical if historical_requested else []
+            if chosen:
+                latest_start = max(_start(row) for row in chosen)
+                selected.extend(row for row in chosen if _start(row) == latest_start)
         return selected
