@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from uuid import uuid4
 
 from apps.tax_workbench.models import TaxFacts
@@ -14,6 +14,17 @@ from .domain import (
     FactStatus,
     FactVersion,
 )
+
+
+def _optional_decimal(value):
+    if value in (None, ""):
+        return None
+    if isinstance(value, Decimal):
+        return value
+    try:
+        return Decimal(str(value).replace(",", "").strip())
+    except (InvalidOperation, ValueError) as exc:
+        raise ValueError(f"invalid numeric fact: {value!r}") from exc
 
 
 class V6Adapter:
@@ -59,18 +70,18 @@ class V6Adapter:
             "transaction.business_date": facts.business_date,
             "transaction.transaction_type": facts.transaction_type,
             "transaction.sales_amount": facts.amount,
-            "transaction.total_sales_same_period": facts.extra.get(
-                "total_sales_same_period", facts.amount
+            "transaction.total_sales_same_period": _optional_decimal(
+                facts.extra.get("total_sales_same_period", facts.amount)
             ),
             "transaction.amount_period": facts.amount_period,
             "transaction.amount_tax_inclusive": facts.amount_tax_inclusive,
-            "transaction.original_levy_rate": (
-                Decimal(str(original_rate)) if original_rate not in (None, "") else None
-            ),
+            "transaction.original_levy_rate": _optional_decimal(original_rate),
             "invoice.need": facts.invoice_need,
             "invoice.need_special_invoice": facts.invoice_need == "专用发票",
             "invoice.waive_exemption": bool(facts.extra.get("waive_exemption", False)),
-            "taxpayer.rolling_sales": facts.extra.get("rolling_sales"),
+            "taxpayer.rolling_sales": _optional_decimal(
+                facts.extra.get("rolling_sales")
+            ),
             "transaction.related_party": facts.related_party,
             "transaction.split_signal": bool(facts.extra.get("split_signal"))
             or "分拆" in facts.description,
