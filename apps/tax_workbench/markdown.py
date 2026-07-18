@@ -6,7 +6,16 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from .models import PlanningResult, TaxFacts
+from .models import EVIDENCE_ROLES, PlanningResult, TaxFacts
+
+ROLE_LABELS = {
+    "support": "支持证据",
+    "limitation": "限制与适用条件",
+    "exclusion": "排除与不适用证据",
+    "historical": "历史与已失效证据",
+    "local": "地方覆盖证据",
+    "conflict": "冲突与待复核证据",
+}
 
 
 def _bullet(items: list[str]) -> str:
@@ -14,15 +23,9 @@ def _bullet(items: list[str]) -> str:
 
 
 def _value(value: Any) -> str:
-    if isinstance(value, dict) and value.get("__type__") in {
-        "decimal",
-        "date",
-        "datetime",
-    }:
+    if isinstance(value, dict) and value.get("__type__") in {"decimal", "date", "datetime"}:
         return str(value.get("value", ""))
-    if value is None:
-        return ""
-    return str(value)
+    return "" if value is None else str(value)
 
 
 def _status_label(raw: str) -> str:
@@ -33,6 +36,82 @@ def _status_label(raw: str) -> str:
         "conflict": "冲突",
         "manual_review_required": "人工复核",
     }.get(raw, raw)
+
+
+def _groups(result: PlanningResult) -> dict[str, list[dict[str, Any]]]:
+    if result.evidence_groups:
+        return {role: list(result.evidence_groups.get(role, [])) for role in EVIDENCE_ROLES}
+    groups = {role: [] for role in EVIDENCE_ROLES}
+    for item in result.evidence:
+        groups.setdefault(item.role, []).append(item.to_dict())
+    return groups
+
+
+def _trace(result: PlanningResult) -> dict[str, Any]:
+    if result.retrieval_trace:
+        return result.retrieval_trace
+    return next((item._retrieval_trace for item in result.evidence if item._retrieval_trace), {})
+
+
+def _render_evidence(lines: list[str], result: PlanningResult) -> None:
+    groups = _groups(result)
+    lines += ["## 法规证据包", ""]
+    for role in EVIDENCE_ROLES:
+        rows = groups.get(role, [])
+        lines += [f"### {ROLE_LABELS[role]}", ""]
+        if not rows:
+            lines += ["- 无", ""]
+            continue
+        for index, item in enumerate(rows, 1):
+            path = str(item.get("path") or "")
+            target = path[:-3] if path.endswith(".md") else path
+            title = str(item.get("title") or Path(path).stem)
+            labels = "，".join(str(value) for value in (item.get("document_number"), item.get("article")) if value)
+            lines.append(f"{index}. [[{target}|{title}]]" + (f"（{labels}）" if labels else ""))
+            lines.append(
+                f"   - 状态：{item.get('status', '')}｜地域：{item.get('jurisdiction_scope', '')}"
+                f"｜等级：{item.get('evidence_tier', '')}｜最终分：{item.get('score', 0)}"
+            )
+            if item.get("valid_from") or item.get("valid_to"):
+                lines.append(f"   - 有效区间：{item.get('valid_from') or '未注明'} 至 {item.get('valid_to') or '持续有效'}")
+            if item.get("match_reasons"):
+                lines.append(f"   - 命中原因：{'；'.join(item['match_reasons'][:8])}")
+            if item.get("score_breakdown"):
+                lines.append(f"   - 评分构成：{json_score(item['score_breakdown'])}")
+            excerpt = str(item.get("excerpt") or "").replace("\n", " ")[:300]
+            if excerpt:
+                lines.append(f"   - 摘要：{excerpt}")
+        lines.append("")
+
+
+def _render_retrieval_trace(lines: list[str], result: PlanningResult) -> None:
+    trace = _trace(result)
+    lines += ["## 检索审计轨迹", ""]
+    if not trace:
+        lines += ["- 无", ""]
+        return
+    lines += [
+        f"- 检索提供方：`{trace.get('provider', '')}`",
+        f"- 门禁前分块：{trace.get('documents_before_gate', 0)}",
+        f"- 门禁后分块：{trace.get('documents_after_gate', 0)}",
+        f"- 初始候选：{trace.get('candidate_count', 0)}",
+        f"- 关系扩展：{trace.get('relation_expanded_count', 0)}",
+        f"- 最终证据：{trace.get('selected_count', 0)}",
+    ]
+    if trace.get("provider_errors"):
+        lines.append(f"- Provider 回退：{'；'.join(trace['provider_errors'])}")
+    plan = trace.get("plan") or {}
+    if plan:
+        lines += ["", "### 子查询", ""]
+        stats = trace.get("query_stats") or {}
+        for query in plan.get("queries", []):
+            query_id = query.get("query_id", "")
+            row = stats.get(query_id, {})
+            lines.append(
+                f"- `{query_id}` [{query.get('role', '')}] {query.get('text', '')}"
+                f"｜门禁后 {row.get('gated', 0)}｜BM25 {row.get('bm25', 0)}｜向量 {row.get('vector', 0)}"
+            )
+    lines.append("")
 
 
 def render_markdown(facts: TaxFacts, result: PlanningResult) -> str:
@@ -82,62 +161,38 @@ def render_markdown(facts: TaxFacts, result: PlanningResult) -> str:
             prefix = "  -" if issue.get("parent_issue_id") else "-"
             lines.append(
                 f"{prefix} `{issue.get('issue_id', '')}` {issue.get('issue_type', '')}"
-                f"｜风险：{issue.get('risk_level', 'low')}"
-                f"｜状态：{issue.get('status', '')}"
+                f"｜风险：{issue.get('risk_level', 'low')}｜状态：{issue.get('status', '')}"
             )
             if issue.get("missing_fact_ids"):
-                lines.append(
-                    f"    - 缺失事实：{', '.join(issue['missing_fact_ids'])}"
-                )
+                lines.append(f"    - 缺失事实：{', '.join(issue['missing_fact_ids'])}")
     else:
         lines.append("- 无")
+    lines.append("")
+    _render_evidence(lines, result)
+    _render_retrieval_trace(lines, result)
 
-    lines += ["", "## 法规依据", ""]
-    if result.evidence:
-        for index, item in enumerate(result.evidence, 1):
-            label = "，".join(x for x in (item.document_number, item.article) if x)
-            target = item.path[:-3] if item.path.endswith(".md") else item.path
-            lines.append(
-                f"{index}. [[{target}|{item.title}]]"
-                + (f"（{label}）" if label else "")
-            )
-            if item.excerpt:
-                lines.append(
-                    f"   - 证据摘要：{item.excerpt.replace(chr(10), ' ')[:240]}"
-                )
-    else:
-        lines.append("1. 未检索到足够的 A 级有效法规依据。")
-
-    lines += ["", "## 规则判断轨迹", ""]
+    lines += ["## 规则判断轨迹", ""]
     if result.rule_trace:
         for evaluation in result.rule_trace:
-            lines.append(
-                f"### `{evaluation.get('rule_id', '')}`｜"
-                f"{_status_label(str(evaluation.get('status', '')))}"
-            )
-            lines.append("")
-            lines.append(
-                f"- 输出：`{evaluation.get('outcome', '')}` = "
-                f"`{_value(evaluation.get('value'))}`"
-            )
-            lines.append(f"- 优先级：{evaluation.get('priority', 0)}")
+            lines += [
+                f"### `{evaluation.get('rule_id', '')}`｜{_status_label(str(evaluation.get('status', '')))}",
+                "",
+                f"- 输出：`{evaluation.get('outcome', '')}` = `{_value(evaluation.get('value'))}`",
+                f"- 优先级：{evaluation.get('priority', 0)}",
+            ]
             if evaluation.get("missing_fact_ids"):
-                lines.append(
-                    f"- 缺失事实：{', '.join(evaluation['missing_fact_ids'])}"
-                )
+                lines.append(f"- 缺失事实：{', '.join(evaluation['missing_fact_ids'])}")
             for trace in evaluation.get("trace", [])[:12]:
                 if trace.get("reason"):
                     lines.append(f"- 轨迹：{trace.get('reason')}")
                 elif trace.get("fact"):
                     lines.append(
-                        f"- `{trace.get('fact')}` {trace.get('operator')} "
-                        f"`{_value(trace.get('expected'))}` → "
-                        f"`{_value(trace.get('actual'))}`，"
-                        f"结果：{trace.get('result', 'missing')}"
+                        f"- `{trace.get('fact')}` {trace.get('operator')} `{_value(trace.get('expected'))}`"
+                        f" → `{_value(trace.get('actual'))}`，结果：{trace.get('result', 'missing')}"
                     )
             lines.append("")
     else:
-        lines.append("- 无")
+        lines += ["- 无", ""]
 
     lines += ["## 税额计算与现金流", ""]
     if result.calculations:
@@ -153,17 +208,12 @@ def render_markdown(facts: TaxFacts, result: PlanningResult) -> str:
                 f"- 使用规则：{', '.join(calculation.get('rule_ids', [])) or '无'}",
             ]
             if calculation.get("missing_fact_ids"):
-                lines.append(
-                    f"- 缺失输入：{', '.join(calculation['missing_fact_ids'])}"
-                )
+                lines.append(f"- 缺失输入：{', '.join(calculation['missing_fact_ids'])}")
             for event in calculation.get("cashflow_events", []):
-                lines.append(
-                    f"- 现金流事件：{event.get('date', '')}｜"
-                    f"{event.get('type', '')}｜{event.get('amount', '')}"
-                )
+                lines.append(f"- 现金流事件：{event.get('date', '')}｜{event.get('type', '')}｜{event.get('amount', '')}")
             lines.append("")
     else:
-        lines.append("- 无")
+        lines += ["- 无", ""]
 
     lines += [
         "## 通俗解释",
@@ -229,9 +279,7 @@ def render_markdown(facts: TaxFacts, result: PlanningResult) -> str:
 
 
 def json_score(components: dict[str, Any]) -> str:
-    if not components:
-        return "无"
-    return "；".join(f"{key}={value}" for key, value in components.items())
+    return "；".join(f"{key}={value}" for key, value in components.items()) if components else "无"
 
 
 def _safe_name(text: str) -> str:
@@ -244,7 +292,6 @@ def save_session(vault: Path, facts: TaxFacts, result: PlanningResult) -> Path:
     root.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
     identity = result.case_id or uuid4().hex[:6]
-    filename = f"{stamp}_{_safe_name(facts.description)}_{identity}.md"
-    path = root / filename
+    path = root / f"{stamp}_{_safe_name(facts.description)}_{identity}.md"
     path.write_text(render_markdown(facts, result), encoding="utf-8")
     return path
