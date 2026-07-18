@@ -148,11 +148,11 @@ class EvidenceBundle:
         return {role: getattr(self, role) for role in sorted(EVIDENCE_ROLES)}
 
     def flatten_current(self) -> list[EvidenceRecord]:
-        seen: set[str] = set()
+        seen: set[tuple[str, str]] = set()
         rows: list[EvidenceRecord] = []
         for role in ("support", "local", "limitation", "exclusion"):
             for item in getattr(self, role):
-                key = item.provision_id or item.path
+                key = (role, item.provision_id or item.path)
                 if key in seen:
                     continue
                 seen.add(key)
