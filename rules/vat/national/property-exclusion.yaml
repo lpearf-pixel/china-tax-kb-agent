@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "status": "effective",
+  "tax_type": "增值税",
+  "tags": ["V7", "deterministic"],
+  "rule_id": "VAT-SMALL-1PCT-PROPERTY-EXCLUSION",
+  "valid_from": "2026-01-01",
+  "valid_to": "2027-12-31",
+  "jurisdiction": "CN",
+  "priority": 200,
+  "exclusive_group": "vat_levy_rate",
+  "description": "不动产及土地使用权排除1%政策",
+  "when": {"fact": "transaction.transaction_type", "operator": "in", "value": ["销售不动产", "出租不动产", "转让土地使用权", "不动产"]},
+  "then": {"outcome": "levy_rate_excluded", "value": true, "confidence": "deterministic", "manual_review_required": true},
+  "requires": ["transaction.transaction_type"],
+  "legal_basis": [{"document_id": "DOC-CN-VAT-MOF-STA-2026-10", "provision_id": "PROV-VAT-ANN10-3TO1"}]
+}

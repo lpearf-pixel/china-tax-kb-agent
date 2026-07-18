@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "status": "effective",
+  "tax_type": "增值税",
+  "tags": ["V7", "deterministic"],
+  "rule_id": "HI-FTP-SPECIAL-POLICY-MANUAL-REVIEW",
+  "valid_from": "2025-12-18",
+  "valid_to": null,
+  "jurisdiction": "CN-HI",
+  "priority": 300,
+  "exclusive_group": "hainan_policy_route",
+  "description": "海南一线二线或进口特殊政策强制门禁",
+  "when": {"any": [
+    {"fact": "hainan.special_scene", "operator": "equals", "value": true},
+    {"fact": "transaction.transaction_type", "operator": "equals", "value": "进口货物"},
+    {"fact": "transaction.cross_border", "operator": "equals", "value": true}
+  ]},
+  "then": {"outcome": "hainan_special_policy_precheck", "value": true, "confidence": "manual_review", "manual_review_required": true},
+  "requires": ["region.code"],
+  "legal_basis": [{"document_id": "DOC-HI-CUSTOMS-2025-12", "provision_id": "PROV-HI-CUSTOMS-2025-12-GATE"}]
+}

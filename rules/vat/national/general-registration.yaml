@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "status": "effective",
+  "tax_type": "增值税",
+  "tags": ["V7", "deterministic"],
+  "rule_id": "VAT-GENERAL-REGISTRATION-5M-2026",
+  "valid_from": "2026-01-01",
+  "valid_to": null,
+  "jurisdiction": "CN",
+  "priority": 150,
+  "exclusive_group": "vat_registration",
+  "description": "连续期间销售额超过500万元的一般纳税人登记提示",
+  "when": {"all": [
+    {"fact": "taxpayer.vat_status", "operator": "equals", "value": "小规模纳税人"},
+    {"fact": "taxpayer.rolling_taxable_sales", "operator": "greater_than", "value": 5000000}
+  ]},
+  "then": {"outcome": "general_registration_required_candidate", "value": true, "confidence": "deterministic", "manual_review_required": true},
+  "requires": ["taxpayer.rolling_taxable_sales"],
+  "legal_basis": [{"document_id": "DOC-CN-VAT-STA-2026-2", "provision_id": "PROV-VAT-ANN2-REG"}]
+}

@@ -67,15 +67,31 @@ class TaxFacts:
         values = {key: data.get(key) for key in known if key != "extra"}
         values["amount"] = _decimal(data.get("amount"))
         for name in (
-            "amount_tax_inclusive", "related_party", "cross_border", "historical_tax",
-            "real_estate", "restructuring", "tax_audit", "hainan_special_scene",
+            "amount_tax_inclusive",
+            "related_party",
+            "cross_border",
+            "historical_tax",
+            "real_estate",
+            "restructuring",
+            "tax_audit",
+            "hainan_special_scene",
         ):
             values[name] = bool(_bool(data.get(name), False))
         values["qualified_entity"] = _bool(data.get("qualified_entity"), None)
-        values["resident_qualification"] = _bool(data.get("resident_qualification"), None)
+        values["resident_qualification"] = _bool(
+            data.get("resident_qualification"), None
+        )
         for name in (
-            "business_date", "region", "taxpayer_type", "vat_status", "transaction_type",
-            "amount_period", "invoice_need", "objective", "description", "hs_code",
+            "business_date",
+            "region",
+            "taxpayer_type",
+            "vat_status",
+            "transaction_type",
+            "amount_period",
+            "invoice_need",
+            "objective",
+            "description",
+            "hs_code",
         ):
             values[name] = str(data.get(name) or "").strip()
         values["extra"] = {key: value for key, value in data.items() if key not in known}
@@ -94,7 +110,9 @@ class TaxFacts:
         if self.vat_status not in VAT_STATUSES:
             errors.append("vat_status 必须明确小规模纳税人、一般纳税人或未知")
         if self.transaction_type not in TRANSACTION_TYPES:
-            errors.append("transaction_type 必须明确货物、服务、无形资产、不动产、进口货物或其他")
+            errors.append(
+                "transaction_type 必须明确货物、服务、无形资产、不动产、进口货物或其他"
+            )
         if self.amount is None:
             errors.append("amount 必须是有效金额")
         elif self.amount < 0:
@@ -112,7 +130,9 @@ class TaxFacts:
     def missing_facts(self) -> list[str]:
         missing: list[str] = []
         hainan_gate = self.region == "CN-HI" and (
-            self.hainan_special_scene or self.transaction_type == "进口货物" or self.cross_border
+            self.hainan_special_scene
+            or self.transaction_type == "进口货物"
+            or self.cross_border
         )
         if hainan_gate:
             if not self.hs_code:
@@ -177,9 +197,18 @@ class PlanningResult:
     missing_facts: list[str] = field(default_factory=list)
     human_review_required: bool = False
     kb_version: str = "KB-2026.07.17-V5-PILOT-XJ-HI"
-    verified_at: str = "2026-07-17"
-    disclaimer: str = "本结果为法规检索和税务规划草案，不替代主管税务机关、注册税务师或律师的正式意见。"
+    verified_at: str = "2026-07-18"
+    disclaimer: str = (
+        "本结果为法规检索和税务规划草案，不替代主管税务机关、"
+        "注册税务师或律师的正式意见。"
+    )
+    case_id: str = ""
+    case_state: str = ""
+    issues: list[dict[str, Any]] = field(default_factory=list)
+    rule_trace: list[dict[str, Any]] = field(default_factory=list)
+    calculations: list[dict[str, Any]] = field(default_factory=list)
+    scenario_scores: list[dict[str, Any]] = field(default_factory=list)
+    audit_events: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
-        payload = asdict(self)
-        return payload
+        return asdict(self)

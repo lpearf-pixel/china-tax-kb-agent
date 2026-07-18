@@ -29,3 +29,7 @@ venv/
 # Generated planning sessions may contain sensitive business facts
 16-交互工作台/会话记录/*
 !16-交互工作台/会话记录/README.md
+
+# Local V7 case data may contain sensitive facts
+cases/*
+!cases/.gitkeep
