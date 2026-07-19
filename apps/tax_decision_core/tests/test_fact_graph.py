@@ -4,8 +4,8 @@ from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
-from apps.tax_decision_core.domain import FactStatus, MissingFact
-from apps.tax_decision_core.fact_graph import FactGraphService
+from apps.tax_decision_core.domain import FactStatus
+from apps.tax_decision_core.fact_graph import FactGraphService, MissingFact
 from apps.tax_decision_core.storage import CaseStorage
 
 
