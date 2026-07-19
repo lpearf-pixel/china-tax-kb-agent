@@ -119,6 +119,11 @@ class TaxFacts:
             missing.append("客户发票类型要求")
         if self.vat_status == "未知":
             missing.append("增值税纳税人登记身份")
+        if self.vat_status == "一般纳税人" and not any(
+            self.extra.get(key) not in (None, "")
+            for key in ("applicable_levy_rate", "levy_rate", "original_levy_rate")
+        ):
+            missing.append("calculation.levy_rate")
         return missing
 
     def to_dict(self) -> dict[str, Any]:
