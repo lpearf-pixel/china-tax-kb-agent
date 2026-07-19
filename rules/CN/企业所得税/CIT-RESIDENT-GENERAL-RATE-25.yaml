@@ -1,0 +1,23 @@
+{
+  "rule_id": "CIT-RESIDENT-GENERAL-RATE-25",
+  "version": 1,
+  "status": "effective",
+  "valid_from": "2008-01-01",
+  "valid_to": null,
+  "jurisdiction": "CN",
+  "tax_type": "企业所得税",
+  "priority": 50,
+  "when": {
+    "all": [
+      {"fact": "cit.resident_status", "operator": "equals", "value": "居民企业"},
+      {"fact": "cit.entity_form", "operator": "not_in", "value": ["个人独资企业", "合伙企业"]}
+    ]
+  },
+  "then": {"outcome": "cit_tax_rate", "value": "0.25"},
+  "requires": ["cit.resident_status", "cit.entity_form"],
+  "legal_basis": [
+    {"document_id": "DOC-CN-CIT-LAW-2018", "provision_id": "PROV-CIT-LAW-001-004"}
+  ],
+  "description": "居民公司制企业一般企业所得税税率25%",
+  "tags": ["企业所得税", "居民企业", "25%"]
+}
