@@ -26,7 +26,18 @@ jobs:
         run: python3 -m unittest discover -s 90-工具/tests -v
 
       - name: V7 decision core tests
-        run: python3 -m unittest discover -s apps/tax_decision_core/tests -v
+        shell: bash
+        run: |
+          set +e
+          python3 -m unittest discover -s apps/tax_decision_core/tests -v > /tmp/v7-tests.log 2>&1
+          status=$?
+          if [ "$status" -ne 0 ]; then
+            echo "===== V7 failure summary ====="
+            tail -n 120 /tmp/v7-tests.log
+          else
+            cat /tmp/v7-tests.log
+          fi
+          exit "$status"
 
       - name: V7.1 retrieval tests
         run: python3 -m unittest discover -s apps/tax_retrieval/tests -v
