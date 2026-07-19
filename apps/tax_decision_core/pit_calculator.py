@@ -7,6 +7,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from .domain import CalculationResult
 
 CENT = Decimal("0.01")
+LABOR_WITHHOLDING_RULE_ID = "PIT-LABOR-REMUNERATION-RESIDENT-WITHHOLDING"
 
 
 def _q(value: Decimal) -> Decimal:
@@ -54,7 +55,7 @@ class PitLaborCalculationContext:
     calculation_id: str
     gross_income: Decimal | None
     already_withheld: Decimal | None
-    payer_has_withholding_obligation: bool | None = True
+    payer_has_withholding_obligation: bool | None = None
     payment_due_date: date | None = None
     rule_ids: list[str] = field(default_factory=list)
 
@@ -110,7 +111,14 @@ class PitCalculator:
             missing.append("pit.labor_gross_income")
         if context.already_withheld is None:
             missing.append("pit.labor_withheld_tax")
-        if context.payer_has_withholding_obligation is not True:
+        withholding_confirmed = (
+            context.payer_has_withholding_obligation is True
+            or (
+                context.payer_has_withholding_obligation is None
+                and LABOR_WITHHOLDING_RULE_ID in context.rule_ids
+            )
+        )
+        if not withholding_confirmed:
             missing.append("pit.labor_payer_has_withholding_obligation")
         if missing:
             return CalculationResult(
