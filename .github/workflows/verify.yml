@@ -23,44 +23,17 @@ jobs:
       - name: Compile Python sources
         run: python3 -m compileall -q apps 90-工具
 
-      - name: TaxKB unit tests
+      - name: TaxKB and legal-content tests
         run: python3 -m unittest discover -s 90-工具/tests -v
 
-      - name: V7 decision core tests
+      - name: V7 and V7.2 decision-core tests
         run: python3 -m unittest discover -s apps/tax_decision_core/tests -v
 
       - name: V7.1 retrieval tests
         run: python3 -m unittest discover -s apps/tax_retrieval/tests -v
 
-      - name: Run workbench compatibility tests
-        shell: bash
-        run: |
-          set +e
-          python3 -m unittest discover -s apps/tax_workbench/tests -v > /tmp/v72-workbench.log 2>&1
-          echo "$?" > /tmp/v72-workbench.status
-          exit 0
-
-      - name: Upload V7.2 workbench diagnostics
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: v72-workbench-diagnostics
-          path: |
-            /tmp/v72-workbench.log
-            /tmp/v72-workbench.status
-          if-no-files-found: error
-          retention-days: 3
-
-      - name: Enforce workbench compatibility test result
-        shell: bash
-        run: |
-          status="$(cat /tmp/v72-workbench.status)"
-          if [ "$status" -ne 0 ]; then
-            tail -n 120 /tmp/v72-workbench.log
-          else
-            cat /tmp/v72-workbench.log
-          fi
-          exit "$status"
+      - name: V6 through V7.2 workbench tests
+        run: python3 -m unittest discover -s apps/tax_workbench/tests -v
 
       - name: Validate Vault metadata and links
         run: python3 90-工具/taxkb_validate.py --report /tmp/taxkb-validation.md
@@ -68,7 +41,7 @@ jobs:
       - name: Build clause-aware index
         run: python3 90-工具/taxkb_export.py --profile full --output /tmp/taxkb-chunks.jsonl
 
-      - name: Run retrieval regression benchmark
+      - name: Run original retrieval regression benchmark
         run: >-
           python3 90-工具/taxkb_eval.py
           --chunks /tmp/taxkb-chunks.jsonl
