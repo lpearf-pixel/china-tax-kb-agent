@@ -54,6 +54,7 @@ class PitLaborCalculationContext:
     calculation_id: str
     gross_income: Decimal | None
     already_withheld: Decimal | None
+    payer_has_withholding_obligation: bool | None = True
     payment_due_date: date | None = None
     rule_ids: list[str] = field(default_factory=list)
 
@@ -109,10 +110,12 @@ class PitCalculator:
             missing.append("pit.labor_gross_income")
         if context.already_withheld is None:
             missing.append("pit.labor_withheld_tax")
+        if context.payer_has_withholding_obligation is not True:
+            missing.append("pit.labor_payer_has_withholding_obligation")
         if missing:
             return CalculationResult(
                 context.calculation_id, "unable_to_calculate", "个人所得税",
-                formula="缺少劳务报酬预扣输入，停止确定性计算。",
+                formula="劳务报酬支付方扣缴义务或预扣输入未确认，停止确定性计算。",
                 missing_fact_ids=missing, rule_ids=list(context.rule_ids),
             )
         gross = _q(max(context.gross_income, Decimal("0")))
@@ -134,6 +137,7 @@ class PitCalculator:
                 "gross_income": gross, "expense_deduction": _q(gross - taxable),
                 "withholding_rate": rate, "quick_deduction": quick,
                 "already_withheld": context.already_withheld,
+                "payer_has_withholding_obligation": True,
                 "annual_settlement_required": True,
             },
             rule_ids=list(context.rule_ids), cashflow_events=events,
