@@ -4,7 +4,6 @@ from pathlib import Path
 from apps.tax_workbench.models import TaxFacts
 from apps.tax_workbench.planner import TaxPlanningService
 
-
 ROOT = Path(__file__).resolve().parents[3]
 
 
@@ -60,7 +59,8 @@ class TaxPlanningServiceTests(unittest.TestCase):
         result = self.service.analyze(facts)
         self.assertTrue(result.human_review_required)
         self.assertIn("商品 HS 编码", result.missing_facts)
-        self.assertTrue(any("不能确定" in risk or "不得" in risk for risk in result.risks))
+        self.assertIn("不能确定", result.initial_conclusion)
+        self.assertTrue(any("海南" in risk or "特殊政策" in risk for risk in result.risks))
 
     def test_related_party_split_signal_requires_review(self):
         result = self.service.analyze(make_facts(related_party=True, description="关联公司拆分销售额"))
