@@ -10,11 +10,18 @@
   "when": {"all": [
     {"fact": "pit.income_category", "operator": "equals", "value": "劳务报酬"},
     {"fact": "pit.resident_status", "operator": "equals", "value": "居民个人"},
-    {"fact": "pit.taxpayer_role", "operator": "equals", "value": "独立劳务个人"}
+    {"fact": "pit.taxpayer_role", "operator": "equals", "value": "独立劳务个人"},
+    {"fact": "pit.labor_payer_has_withholding_obligation", "operator": "is_true"}
   ]},
   "then": {"outcome": "pit_labor_withholding_required", "value": true},
-  "requires": ["pit.income_category", "pit.resident_status", "pit.taxpayer_role", "pit.labor_gross_income"],
+  "requires": [
+    "pit.income_category",
+    "pit.resident_status",
+    "pit.taxpayer_role",
+    "pit.labor_gross_income",
+    "pit.labor_payer_has_withholding_obligation"
+  ],
   "legal_basis": [{"document_id": "DOC-CN-PIT-STA-2018-61", "provision_id": "PROV-PIT-LABOR-WITHHOLDING"}],
-  "description": "居民个人劳务报酬按次或按月预扣预缴个人所得税",
-  "tags": ["个人所得税", "劳务报酬", "预扣预缴"]
+  "description": "居民个人劳务报酬在支付方扣缴义务明确时按次或按月预扣预缴个人所得税",
+  "tags": ["个人所得税", "劳务报酬", "预扣预缴", "扣缴义务"]
 }
