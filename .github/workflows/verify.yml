@@ -23,16 +23,16 @@ jobs:
       - name: Compile Python sources
         run: python3 -m compileall -q apps 90-工具
 
-      - name: TaxKB unit tests
+      - name: TaxKB and legal-content tests
         run: python3 -m unittest discover -s 90-工具/tests -v
 
-      - name: V7 decision core tests
+      - name: V7 and V7.2 decision-core tests
         run: python3 -m unittest discover -s apps/tax_decision_core/tests -v
 
       - name: V7.1 retrieval tests
         run: python3 -m unittest discover -s apps/tax_retrieval/tests -v
 
-      - name: Workbench compatibility tests
+      - name: V6 through V7.2 workbench tests
         run: python3 -m unittest discover -s apps/tax_workbench/tests -v
 
       - name: Validate Vault metadata and links
@@ -41,7 +41,7 @@ jobs:
       - name: Build clause-aware index
         run: python3 90-工具/taxkb_export.py --profile full --output /tmp/taxkb-chunks.jsonl
 
-      - name: Run retrieval regression benchmark
+      - name: Run original retrieval regression benchmark
         run: >-
           python3 90-工具/taxkb_eval.py
           --chunks /tmp/taxkb-chunks.jsonl

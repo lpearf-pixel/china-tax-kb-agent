@@ -1,0 +1,16 @@
+{
+  "rule_id": "CIT-SOLE-PROP-PARTNERSHIP-EXCLUSION",
+  "version": 1,
+  "status": "effective",
+  "valid_from": "2008-01-01",
+  "valid_to": null,
+  "jurisdiction": "CN",
+  "tax_type": "企业所得税",
+  "priority": 120,
+  "when": {"fact": "cit.entity_form", "operator": "in", "value": ["个人独资企业", "合伙企业"]},
+  "then": {"outcome": "cit_taxpayer_excluded", "value": true},
+  "requires": ["cit.entity_form"],
+  "legal_basis": [{"document_id": "DOC-CN-CIT-LAW-2018", "provision_id": "PROV-CIT-LAW-001-004"}],
+  "description": "指定实体形式不进入企业所得税自动计算",
+  "tags": ["企业所得税", "实体形式", "范围"]
+}

@@ -1,0 +1,35 @@
+{
+  "rule_id": "CIT-SMALL-LOW-PROFIT-RATE-2023-2027",
+  "version": 1,
+  "status": "effective",
+  "valid_from": "2023-01-01",
+  "valid_to": "2027-12-31",
+  "jurisdiction": "CN",
+  "tax_type": "企业所得税",
+  "priority": 90,
+  "when": {
+    "all": [
+      {"fact": "cit.resident_status", "operator": "equals", "value": "居民企业"},
+      {"fact": "cit.entity_form", "operator": "not_in", "value": ["个人独资企业", "合伙企业"]},
+      {"fact": "cit.restricted_industry", "operator": "is_false"},
+      {"fact": "cit.estimated_taxable_income", "operator": "less_or_equal", "value": 3000000},
+      {"fact": "cit.employee_count_avg", "operator": "less_or_equal", "value": 300},
+      {"fact": "cit.asset_total_avg", "operator": "less_or_equal", "value": 50000000}
+    ]
+  },
+  "then": {"outcome": "cit_tax_rate", "value": "0.20"},
+  "requires": [
+    "cit.resident_status",
+    "cit.entity_form",
+    "cit.restricted_industry",
+    "cit.estimated_taxable_income",
+    "cit.employee_count_avg",
+    "cit.asset_total_avg",
+    "cit.has_unincorporated_branches"
+  ],
+  "legal_basis": [
+    {"document_id": "DOC-CN-CIT-MOF-STA-2023-12", "provision_id": "PROV-CIT-SME-2023-12"}
+  ],
+  "description": "小型微利企业按20%税率缴纳企业所得税",
+  "tags": ["企业所得税", "小型微利企业", "20%税率"]
+}
