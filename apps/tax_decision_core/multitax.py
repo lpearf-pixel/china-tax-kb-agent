@@ -43,7 +43,7 @@ class MultiTaxScenarioAggregator:
             Scenario(
                 scenario_id="scenario-cit-baseline",
                 name="企业所得税合规基线",
-                total_tax=Decimal("0"),
+                total_tax=None,
             )
         ]
         results: list[MultiTaxScenario] = []
