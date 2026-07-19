@@ -25,70 +25,14 @@ jobs:
       - name: TaxKB unit tests
         run: python3 -m unittest discover -s 90-工具/tests -v
 
-      - name: Run V7 decision core tests
-        shell: bash
-        run: |
-          set +e
-          python3 -m unittest discover -s apps/tax_decision_core/tests -v > /tmp/v7-tests.log 2>&1
-          echo "$?" > /tmp/v7-tests.status
-          exit 0
-
-      - name: Upload V7 test diagnostics
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: v7-test-diagnostics
-          path: |
-            /tmp/v7-tests.log
-            /tmp/v7-tests.status
-          if-no-files-found: error
-          retention-days: 3
-
-      - name: Enforce V7 decision core test result
-        shell: bash
-        run: |
-          status="$(cat /tmp/v7-tests.status)"
-          if [ "$status" -ne 0 ]; then
-            echo "===== V7 failure summary ====="
-            tail -n 120 /tmp/v7-tests.log
-          else
-            cat /tmp/v7-tests.log
-          fi
-          exit "$status"
+      - name: V7 decision core tests
+        run: python3 -m unittest discover -s apps/tax_decision_core/tests -v
 
       - name: V7.1 retrieval tests
         run: python3 -m unittest discover -s apps/tax_retrieval/tests -v
 
-      - name: Run workbench compatibility tests
-        shell: bash
-        run: |
-          set +e
-          python3 -m unittest discover -s apps/tax_workbench/tests -v > /tmp/workbench-tests.log 2>&1
-          echo "$?" > /tmp/workbench-tests.status
-          exit 0
-
-      - name: Upload workbench test diagnostics
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: workbench-test-diagnostics
-          path: |
-            /tmp/workbench-tests.log
-            /tmp/workbench-tests.status
-          if-no-files-found: error
-          retention-days: 3
-
-      - name: Enforce workbench compatibility test result
-        shell: bash
-        run: |
-          status="$(cat /tmp/workbench-tests.status)"
-          if [ "$status" -ne 0 ]; then
-            echo "===== Workbench failure summary ====="
-            tail -n 120 /tmp/workbench-tests.log
-          else
-            cat /tmp/workbench-tests.log
-          fi
-          exit "$status"
+      - name: Workbench compatibility tests
+        run: python3 -m unittest discover -s apps/tax_workbench/tests -v
 
       - name: Validate Vault metadata and links
         run: python3 90-工具/taxkb_validate.py --report /tmp/taxkb-validation.md
