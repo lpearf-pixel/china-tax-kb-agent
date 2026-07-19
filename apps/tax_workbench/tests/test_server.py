@@ -44,13 +44,16 @@ class ServerTests(unittest.TestCase):
         status, payload = self.request("/health")
         self.assertEqual(status, 200)
         self.assertEqual(payload["status"], "ok")
-        self.assertEqual(payload["decision_core"], "v7.2")
+        self.assertEqual(payload["decision_core"], "v7.2.1")
         status, payload = self.request("/api/schema")
         self.assertEqual(status, 200)
         self.assertIn("regions", payload)
-        self.assertEqual(payload["decision_core"], "V7.2")
+        self.assertEqual(payload["decision_core"], "V7.2.1")
         self.assertIn("企业所得税", payload["supported_tax_types"])
+        self.assertIn("个人所得税", payload["supported_tax_types"])
         self.assertIn("cit_accounting_profit", payload["cit_fields"])
+        self.assertIn("pit_business_taxable_income", payload["pit_fields"])
+        self.assertIn("经营所得", payload["pit_income_categories"])
 
     def test_invalid_json_returns_400(self):
         req = urllib.request.Request(self.base + "/api/analyze", data=b"{", method="POST", headers={"Content-Type": "application/json"})

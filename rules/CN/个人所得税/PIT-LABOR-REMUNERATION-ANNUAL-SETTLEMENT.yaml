@@ -1,0 +1,22 @@
+{
+  "rule_id": "PIT-LABOR-REMUNERATION-ANNUAL-SETTLEMENT",
+  "version": 1,
+  "status": "effective",
+  "valid_from": "2019-01-01",
+  "valid_to": null,
+  "jurisdiction": "CN",
+  "tax_type": "个人所得税",
+  "priority": 60,
+  "when": {"all": [
+    {"fact": "pit.income_category", "operator": "equals", "value": "劳务报酬"},
+    {"fact": "pit.resident_status", "operator": "equals", "value": "居民个人"}
+  ]},
+  "then": {"outcome": "pit_annual_settlement_required", "value": true, "confidence": "conditional"},
+  "requires": ["pit.income_category", "pit.resident_status"],
+  "legal_basis": [
+    {"document_id": "DOC-CN-PIT-LAW-2018", "provision_id": "PROV-PIT-LAW-001-003"},
+    {"document_id": "DOC-CN-PIT-STA-2018-61", "provision_id": "PROV-PIT-LABOR-WITHHOLDING"}
+  ],
+  "description": "居民个人劳务报酬预扣后并入综合所得年度汇算",
+  "tags": ["个人所得税", "劳务报酬", "综合所得", "年度汇算"]
+}

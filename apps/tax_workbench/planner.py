@@ -13,6 +13,8 @@ from apps.tax_decision_core.domain import CalculationResult, CaseState, RuleEval
 from apps.tax_decision_core.fact_graph import FactGraphService
 from apps.tax_decision_core.issues import IssueEngine
 from apps.tax_decision_core.multitax import MultiTaxScenarioAggregator
+from apps.tax_decision_core.pit_calculator import PitBusinessCalculationContext, PitLaborCalculationContext, PitCalculator
+from apps.tax_decision_core.pit_issues import PitIssueEngine
 from apps.tax_decision_core.rule_engine import EvaluationBundle, RuleEngine
 from apps.tax_decision_core.rule_loader import RuleLoader
 from apps.tax_decision_core.scenarios import PlanningObjective, ScenarioEngine
@@ -37,9 +39,11 @@ class TaxPlanningService:
         self.adapter = V6Adapter()
         self.vat_issue_engine = IssueEngine()
         self.cit_issue_engine = CitIssueEngine()
+        self.pit_issue_engine = PitIssueEngine()
         self.rule_engine = RuleEngine()
         self.vat_calculator = VatCalculator()
         self.cit_calculator = CitCalculator()
+        self.pit_calculator = PitCalculator()
         self.scenario_engine = ScenarioEngine()
         self.multitax_aggregator = MultiTaxScenarioAggregator()
         self.storage = CaseStorage(case_root or self.vault / "cases")
@@ -47,7 +51,7 @@ class TaxPlanningService:
         self.workflow = CaseWorkflow(self.storage)
 
     def _evidence(self, facts: TaxFacts):
-        return list(self.retriever.search(facts, top_k=10))
+        return list(self.retriever.search(facts, top_k=12))
 
     @staticmethod
     def _selected(bundle: EvaluationBundle, group: str):
@@ -56,6 +60,15 @@ class TaxPlanningService:
     @staticmethod
     def _evaluation(bundle: EvaluationBundle, rule_id: str):
         return next((item for item in bundle.evaluations if item.rule_id == rule_id), None)
+
+    @staticmethod
+    def _merge_bundles(*bundles: EvaluationBundle) -> EvaluationBundle:
+        combined = EvaluationBundle()
+        for bundle in bundles:
+            combined.evaluations.extend(bundle.evaluations)
+            combined.selected.update(bundle.selected)
+            combined.conflicts.extend(bundle.conflicts)
+        return combined
 
     def _vat_calculations(self, facts: TaxFacts, bundle: EvaluationBundle) -> list[CalculationResult]:
         if not bundle.evaluations:
@@ -88,36 +101,23 @@ class TaxPlanningService:
             if facts.vat_status == "小规模纳税人" else None
         )
         due = date.fromisoformat(facts.business_date) + timedelta(days=30)
-        applicable = [
-            item.rule_id for item in bundle.evaluations
-            if item.status == RuleEvaluationStatus.APPLICABLE
-        ]
+        applicable = [item.rule_id for item in bundle.evaluations if item.status == RuleEvaluationStatus.APPLICABLE]
         baseline = self.vat_calculator.calculate(CalculationContext(
             "calc-baseline", facts.vat_status, facts.amount, facts.amount_tax_inclusive,
             rate, threshold_ok, False, "普通发票", payment_due_date=due, rule_ids=applicable,
         ))
-        baseline.inputs.update({
-            "scenario_name": "合规基线",
-            "decision_variables": {"invoice_type": "普通发票", "waive_exemption": False},
-        })
+        baseline.inputs.update({"scenario_name": "合规基线", "decision_variables": {"invoice_type": "普通发票", "waive_exemption": False}})
         invoice = self.vat_calculator.calculate(CalculationContext(
             "calc-invoice", facts.vat_status, facts.amount, facts.amount_tax_inclusive,
             rate, threshold_ok, True, "专用发票", payment_due_date=due, rule_ids=applicable,
         ))
-        invoice.inputs.update({
-            "scenario_name": "发票与申报协同",
-            "decision_variables": {"invoice_type": "专用发票", "waive_exemption": True},
-        })
+        invoice.inputs.update({"scenario_name": "发票与申报协同", "decision_variables": {"invoice_type": "专用发票", "waive_exemption": True}})
         growth = CalculationResult(
             "calc-growth", "conditional_determinate", "增值税",
-            taxable_amount=baseline.taxable_amount,
-            tax_amount=baseline.tax_amount,
+            taxable_amount=baseline.taxable_amount, tax_amount=baseline.tax_amount,
             payable_or_credit=baseline.payable_or_credit,
             formula="基于当前身份的增长敏感性基线；登记一般纳税人后需补充进项和适用税率",
-            inputs={
-                "scenario_name": "纳税人身份与增长评估",
-                "decision_variables": {"voluntary_general_taxpayer": True},
-            },
+            inputs={"scenario_name": "纳税人身份与增长评估", "decision_variables": {"voluntary_general_taxpayer": True}},
             rule_ids=applicable,
         )
         return [baseline, invoice, growth]
@@ -154,37 +154,65 @@ class TaxPlanningService:
             and small_rate and small_rate.status == RuleEvaluationStatus.APPLICABLE
         )
         rate = Decimal(str(small_rate.value)) if small else (
-            Decimal(str(general.value))
-            if general and general.status == RuleEvaluationStatus.APPLICABLE else None
+            Decimal(str(general.value)) if general and general.status == RuleEvaluationStatus.APPLICABLE else None
         )
         ratio = Decimal(str(ratio_eval.value)) if small else Decimal("1")
-        applicable = [
-            item.rule_id for item in bundle.evaluations
-            if item.status == RuleEvaluationStatus.APPLICABLE
-        ]
+        applicable = [item.rule_id for item in bundle.evaluations if item.status == RuleEvaluationStatus.APPLICABLE]
         business_year = date.fromisoformat(facts.business_date).year
         return self.cit_calculator.calculate(CitCalculationContext(
-            calculation_id="cit-baseline",
-            accounting_profit=facts.cit_accounting_profit,
-            adjustment_increase=facts.cit_adjustment_increase,
-            adjustment_decrease=facts.cit_adjustment_decrease,
-            loss_carryforward=facts.cit_loss_carryforward,
-            tax_rate=rate,
-            taxable_income_ratio=ratio,
-            tax_credit=facts.cit_tax_credit,
-            prepaid_tax=facts.cit_prepaid_tax,
-            payment_due_date=date(business_year + 1, 5, 31),
+            "cit-baseline", facts.cit_accounting_profit, facts.cit_adjustment_increase,
+            facts.cit_adjustment_decrease, facts.cit_loss_carryforward, rate,
+            taxable_income_ratio=ratio, tax_credit=facts.cit_tax_credit,
+            prepaid_tax=facts.cit_prepaid_tax, payment_due_date=date(business_year + 1, 5, 31),
             rule_ids=applicable,
         ))
 
-    @staticmethod
-    def _merge_bundles(*bundles: EvaluationBundle) -> EvaluationBundle:
-        combined = EvaluationBundle()
-        for bundle in bundles:
-            combined.evaluations.extend(bundle.evaluations)
-            combined.selected.update(bundle.selected)
-            combined.conflicts.extend(bundle.conflicts)
-        return combined
+    def _pit_calculation(self, facts: TaxFacts, bundle: EvaluationBundle) -> CalculationResult:
+        nonresident = self._evaluation(bundle, "PIT-NONRESIDENT-MANUAL-REVIEW")
+        partnership = self._evaluation(bundle, "PIT-PARTNERSHIP-ALLOCATION-MANUAL-REVIEW")
+        if (
+            nonresident and nonresident.status == RuleEvaluationStatus.MANUAL_REVIEW_REQUIRED
+        ) or (
+            partnership and partnership.status == RuleEvaluationStatus.MANUAL_REVIEW_REQUIRED
+        ):
+            rule_ids = [item.rule_id for item in (nonresident, partnership) if item is not None]
+            return CalculationResult(
+                "pit-manual-review", "unable_to_calculate", "个人所得税",
+                formula="非居民个人、境外所得或合伙企业分配事项需要人工核验。",
+                missing_fact_ids=["pit.special_review_facts"], rule_ids=rule_ids,
+            )
+        if not bundle.evaluations:
+            return CalculationResult(
+                "pit-rule-set-missing", "unable_to_calculate", "个人所得税",
+                formula="目标日期没有加载到有效个人所得税规则。",
+                missing_fact_ids=["rules.valid_on_pit_rule_set"],
+            )
+        applicable = [item.rule_id for item in bundle.evaluations if item.status == RuleEvaluationStatus.APPLICABLE]
+        year = date.fromisoformat(facts.business_date).year
+        if facts.pit_income_category == "经营所得":
+            half = self._evaluation(bundle, "PIT-INDIVIDUAL-BUSINESS-HALF-2023-2027")
+            half_ok = bool(half and half.status == RuleEvaluationStatus.APPLICABLE and half.value is True)
+            return self.pit_calculator.calculate_business(PitBusinessCalculationContext(
+                calculation_id="pit-business-baseline",
+                taxable_income=facts.pit_business_taxable_income,
+                other_tax_reduction=facts.pit_business_other_tax_reduction,
+                prepaid_tax=facts.pit_business_prepaid_tax,
+                individual_business_half_reduction=half_ok,
+                payment_due_date=date(year + 1, 3, 31),
+                rule_ids=applicable,
+            ))
+        if facts.pit_income_category == "劳务报酬":
+            return self.pit_calculator.calculate_labor(PitLaborCalculationContext(
+                calculation_id="pit-labor-withholding",
+                gross_income=facts.pit_labor_gross_income,
+                already_withheld=facts.pit_labor_withheld_tax,
+                payment_due_date=date.fromisoformat(facts.business_date) + timedelta(days=30),
+                rule_ids=applicable,
+            ))
+        return CalculationResult(
+            "pit-income-category-missing", "unable_to_calculate", "个人所得税",
+            formula="未识别个人所得税所得类别。", missing_fact_ids=["pit.income_category"],
+        )
 
     def _run(self, facts: TaxFacts, case_id: str | None = None):
         errors = facts.validate()
@@ -193,44 +221,41 @@ class TaxPlanningService:
         case, graph = self.adapter.to_v7(facts, case_id)
         valid_on = date.fromisoformat(facts.business_date)
 
-        vat_bundle = EvaluationBundle()
-        vat_issues = []
+        vat_bundle, cit_bundle, pit_bundle = EvaluationBundle(), EvaluationBundle(), EvaluationBundle()
+        vat_issues, cit_issues, pit_issues = [], [], []
         vat_calculations: list[CalculationResult] = []
+        cit_calculations: list[CalculationResult] = []
+        pit_calculations: list[CalculationResult] = []
         vat_scenarios = []
+
         if "增值税" in facts.requested_tax_types:
             vat_rules = self.rule_loader.load(valid_on, facts.region, "增值税")
             vat_bundle = self.rule_engine.evaluate_all(vat_rules, graph, valid_on)
             vat_issues = self.vat_issue_engine.identify(case, graph)
             vat_calculations = self._vat_calculations(facts, vat_bundle)
-            vat_scenarios = self.scenario_engine.generate(
-                case, vat_issues, vat_bundle.evaluations + vat_bundle.conflicts, vat_calculations
-            )
-
-        cit_bundle = EvaluationBundle()
-        cit_issues = []
-        cit_calculations: list[CalculationResult] = []
+            vat_scenarios = self.scenario_engine.generate(case, vat_issues, vat_bundle.evaluations + vat_bundle.conflicts, vat_calculations)
         if "企业所得税" in facts.requested_tax_types:
             cit_rules = self.rule_loader.load(valid_on, facts.region, "企业所得税")
             cit_bundle = self.rule_engine.evaluate_all(cit_rules, graph, valid_on)
             cit_issues = self.cit_issue_engine.identify(case, graph)
             cit_calculations = [self._cit_calculation(facts, cit_bundle)]
+        if "个人所得税" in facts.requested_tax_types:
+            pit_rules = self.rule_loader.load(valid_on, facts.region, "个人所得税")
+            pit_bundle = self.rule_engine.evaluate_all(pit_rules, graph, valid_on)
+            pit_issues = self.pit_issue_engine.identify(case, graph)
+            pit_calculations = [self._pit_calculation(facts, pit_bundle)]
 
-        combined_bundle = self._merge_bundles(vat_bundle, cit_bundle)
-        issues = vat_issues + cit_issues
-        calculations = vat_calculations + cit_calculations
-        scenarios = (
-            self.multitax_aggregator.combine(vat_scenarios, cit_calculations)
-            if cit_calculations else vat_scenarios
-        )
-        if any(issue.risk_level == "high" or issue.status == "manual_review_required" for issue in cit_issues):
+        combined_bundle = self._merge_bundles(vat_bundle, cit_bundle, pit_bundle)
+        issues = vat_issues + cit_issues + pit_issues
+        calculations = vat_calculations + cit_calculations + pit_calculations
+        shared = cit_calculations + pit_calculations
+        scenarios = self.multitax_aggregator.combine(vat_scenarios, shared) if shared else vat_scenarios
+        if any(issue.risk_level == "high" or issue.status == "manual_review_required" for issue in cit_issues + pit_issues):
             for scenario in scenarios:
                 scenario.human_review_required = True
         scores = self.scenario_engine.rank(
             scenarios,
-            PlanningObjective(
-                desired_invoice_type=facts.invoice_need
-                if facts.invoice_need in {"普通发票", "专用发票"} else ""
-            ),
+            PlanningObjective(desired_invoice_type=facts.invoice_need if facts.invoice_need in {"普通发票", "专用发票"} else ""),
         )
         evidence = self._evidence(facts)
         return case, graph, combined_bundle, issues, calculations, scenarios, scores, evidence
@@ -238,14 +263,22 @@ class TaxPlanningService:
     def _result(self, facts, case, graph, bundle, issues, calculations, scenarios, scores, evidence):
         vat_requested = "增值税" in facts.requested_tax_types
         cit_requested = "企业所得税" in facts.requested_tax_types
+        pit_requested = "个人所得税" in facts.requested_tax_types
         threshold = self._selected(bundle, "vat_threshold")
         threshold_ok = bool(threshold and threshold.status == RuleEvaluationStatus.APPLICABLE)
-        special = facts.region == "CN-HI" and (
-            facts.hainan_special_scene or facts.transaction_type == "进口货物" or facts.cross_border
-        )
+        special = facts.region == "CN-HI" and (facts.hainan_special_scene or facts.transaction_type == "进口货物" or facts.cross_border)
         cit_calc = next((item for item in calculations if item.tax_type == "企业所得税"), None)
+        pit_calc = next((item for item in calculations if item.tax_type == "个人所得税"), None)
 
-        if not vat_requested and cit_requested:
+        if pit_requested and not vat_requested and not cit_requested:
+            if pit_calc and pit_calc.status in {"determinate", "conditional_determinate"}:
+                label = "经营所得税额" if facts.pit_income_category == "经营所得" else "劳务报酬预扣税额"
+                initial = f"个人所得税已完成基础计算，{label}为 {pit_calc.tax_amount}，当前应补退/补扣候选为 {pit_calc.payable_or_credit}。"
+                if facts.pit_income_category == "劳务报酬":
+                    initial += " 该预扣税额不是最终年度税负，居民个人仍需按规定办理综合所得年度汇算。"
+            else:
+                initial = "个人所得税居民身份、所得分类或分配资料不足，当前不能输出确定税额。"
+        elif not vat_requested and cit_requested:
             if cit_calc and cit_calc.status == "determinate":
                 initial = f"企业所得税已完成初步计算，应纳所得税额为 {cit_calc.tax_amount}，应补退税候选为 {cit_calc.payable_or_credit}。"
             elif cit_calc and cit_calc.status == "not_applicable":
@@ -255,22 +288,19 @@ class TaxPlanningService:
         elif special:
             initial = "海南自贸港特殊政策关键事实不足，目前不能确定零关税或其他优惠是否适用。"
         elif vat_requested and threshold_ok:
-            initial = (
-                {"月": "月10万元", "季度": "季度30万元", "单次": "每次（日）1000元"}.get(facts.amount_period, "起征点")
-                + "起征点条件已由规则引擎初步命中；仍需确认同期间全部销售额和是否放弃免税。"
-            )
+            initial = ({"月": "月10万元", "季度": "季度30万元", "单次": "每次（日）1000元"}.get(facts.amount_period, "起征点") + "起征点条件已由规则引擎初步命中；仍需确认同期间全部销售额和是否放弃免税。")
         else:
-            initial = "当前未命中增值税起征点候选，需按规则结果继续计算。"
-        if vat_requested and cit_requested and cit_calc:
-            initial += f" 企业所得税已纳入综合方案，当前应纳所得税额为 {cit_calc.tax_amount if cit_calc.tax_amount is not None else '待补资料'}。"
+            initial = "已按所选税种执行规则与计算，需结合分项结果和待补事实判断。"
+        if sum((vat_requested, cit_requested, pit_requested)) > 1:
+            if cit_calc:
+                initial += f" 企业所得税分项：{cit_calc.tax_amount if cit_calc.tax_amount is not None else '待补资料'}。"
+            if pit_calc:
+                initial += f" 个人所得税分项：{pit_calc.tax_amount if pit_calc.tax_amount is not None else '待补资料'}。"
 
         regional = (
-            "新疆事项采用全国规则底座并叠加新疆覆盖层。"
-            if facts.region == "CN-XJ" else
-            "该事项进入海南特殊政策门禁，享惠主体、HS编码、流向和用途必须人工复核。"
-            if facts.region == "CN-HI" and special else
-            "海南普通境内业务先适用全国税收规则。"
-            if facts.region == "CN-HI" else "适用全国税收法规。"
+            "新疆事项采用全国规则底座并叠加新疆覆盖层。" if facts.region == "CN-XJ" else
+            "该事项进入海南特殊政策门禁，享惠主体、HS编码、流向和用途必须人工复核。" if facts.region == "CN-HI" and special else
+            "海南普通境内业务先适用全国税收规则。" if facts.region == "CN-HI" else "适用全国税收法规。"
         )
         calc_by_id = {item.calculation_id: item for item in calculations}
         schemes = []
@@ -280,17 +310,14 @@ class TaxPlanningService:
             summary = "；".join(dict.fromkeys(formulas)) or "需要补齐资料后计算。"
             if any(item.inputs.get("levy_rate") == Decimal("0.01") for item in related):
                 summary += "；符合条件时体现1%征收率方向。"
-            breakdown = {
-                key: TaxAmount(value)
-                for key, value in dict(getattr(scenario, "tax_breakdown", {}) or {}).items()
-            }
+            if any(item.tax_type == "个人所得税" and item.status == "conditional_determinate" for item in related):
+                summary += "；个人所得税当前金额属于预扣候选，年度汇算可能多退少补。"
+            breakdown = {key: TaxAmount(value) for key, value in dict(getattr(scenario, "tax_breakdown", {}) or {}).items()}
             schemes.append(MultiTaxSchemeOption(
-                name=scenario.name,
-                summary=summary,
-                actions=["确认事实和规则命中", "核对发票、申报和付款时间", "正式执行前保存完整资料链"],
+                name=scenario.name, summary=summary,
+                actions=["确认事实和规则命中", "核对申报、扣缴和付款时间", "正式执行前保存完整资料链"],
                 benefits=["税额和现金流可追溯", "税种分项和评分构成透明"],
-                risks=list(scenario.risks),
-                required_documents=list(scenario.required_documents),
+                risks=list(scenario.risks), required_documents=list(scenario.required_documents),
                 estimated_tax=str(scenario.total_tax) if scenario.total_tax is not None else "无法确定",
                 tax_breakdown=breakdown,
             ))
@@ -306,16 +333,12 @@ class TaxPlanningService:
             or bool(bundle.conflicts)
             or any(issue.risk_level == "high" or issue.status == "manual_review_required" for issue in issues)
         )
-        vat_rule_present = any(item.rule_id.startswith(("VAT-", "HI-")) for item in bundle.evaluations)
-        cit_rule_present = any(item.rule_id.startswith("CIT-") for item in bundle.evaluations)
-        if vat_requested and not vat_rule_present:
-            risks.append("目标日期缺少已验证增值税规则集。")
-            missing.append("目标日期有效增值税规则集")
-            review = True
-        if cit_requested and not cit_rule_present:
-            risks.append("目标日期缺少已验证企业所得税规则集。")
-            missing.append("目标日期有效企业所得税规则集")
-            review = True
+        prefixes = {"增值税": ("VAT-", "HI-"), "企业所得税": ("CIT-",), "个人所得税": ("PIT-",)}
+        for tax_type in facts.requested_tax_types:
+            if not any(item.rule_id.startswith(prefixes[tax_type]) for item in bundle.evaluations):
+                risks.append(f"目标日期缺少已验证{tax_type}规则集。")
+                missing.append(f"目标日期有效{tax_type}规则集")
+                review = True
         if not evidence:
             risks.append("未检索到足够的A级有效法规证据，当前结果不得作为确定结论。")
             missing.append("A级有效法规证据")
@@ -324,31 +347,23 @@ class TaxPlanningService:
         return PlanningResult(
             initial_conclusion=initial,
             applicable_conditions=[
-                f"分析税种：{', '.join(facts.requested_tax_types)}",
-                f"地区：{facts.region}",
-                f"纳税人类型：{facts.taxpayer_type}",
-                f"增值税身份：{facts.vat_status}",
-                f"企业实体形式：{facts.entity_form or '未选择'}",
-                f"业务时间：{facts.business_date}",
+                f"分析税种：{', '.join(facts.requested_tax_types)}", f"地区：{facts.region}",
+                f"纳税人类型：{facts.taxpayer_type}", f"增值税身份：{facts.vat_status}",
+                f"企业实体形式：{facts.entity_form or '未选择'}", f"个人所得类别：{facts.pit_income_category or '未选择'}",
+                f"个人纳税人角色：{facts.pit_taxpayer_role or '未选择'}", f"业务时间：{facts.business_date}",
                 f"交易类型：{facts.transaction_type}",
             ],
             evidence=evidence,
             explanation="系统已通过事实图谱、分税种规则引擎和Decimal计算器生成结果。",
-            regional_application=regional,
-            schemes=schemes,
-            risks=list(dict.fromkeys(risks)),
-            missing_facts=list(dict.fromkeys(missing)),
-            human_review_required=review,
-            kb_version=KB_VERSION,
-            verified_at=VERIFIED_AT,
-            case_id=case.case_id,
-            case_state=case.state.value,
+            regional_application=regional, schemes=schemes,
+            risks=list(dict.fromkeys(risks)), missing_facts=list(dict.fromkeys(missing)),
+            human_review_required=review, kb_version=KB_VERSION, verified_at=VERIFIED_AT,
+            case_id=case.case_id, case_state=case.state.value,
             issues=[item.to_dict() for item in issues],
             rule_trace=[item.to_dict() for item in bundle.evaluations + bundle.conflicts],
             calculations=[item.to_dict() for item in calculations],
             scenario_scores=[{
-                "scenario_id": score.scenario_id,
-                "total_score": str(score.total_score),
+                "scenario_id": score.scenario_id, "total_score": str(score.total_score),
                 "components": {key: str(value) for key, value in score.components.items()},
             } for score in scores],
         )

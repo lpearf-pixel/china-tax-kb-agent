@@ -6,14 +6,7 @@ from uuid import uuid4
 
 from apps.tax_workbench.models import TaxFacts
 
-from .domain import (
-    CaseRecord,
-    CaseState,
-    Fact,
-    FactGraph,
-    FactStatus,
-    FactVersion,
-)
+from .domain import CaseRecord, CaseState, Fact, FactGraph, FactStatus, FactVersion
 
 
 def _optional_decimal(value):
@@ -28,12 +21,7 @@ def _optional_decimal(value):
 
 
 def _estimated_taxable_income(facts: TaxFacts) -> Decimal | None:
-    values = (
-        facts.cit_accounting_profit,
-        facts.cit_adjustment_increase,
-        facts.cit_adjustment_decrease,
-        facts.cit_loss_carryforward,
-    )
+    values = (facts.cit_accounting_profit, facts.cit_adjustment_increase, facts.cit_adjustment_decrease, facts.cit_loss_carryforward)
     if any(value is None for value in values):
         return None
     profit, increase, decrease, loss = values
@@ -42,38 +30,15 @@ def _estimated_taxable_income(facts: TaxFacts) -> Decimal | None:
 
 class V6Adapter:
     @staticmethod
-    def _fact(
-        fact_id: str,
-        value,
-        now: datetime,
-        source: str = "v6_form",
-    ) -> Fact:
-        return Fact(
-            fact_id,
-            [
-                FactVersion(
-                    fact_id,
-                    1,
-                    value,
-                    FactStatus.CONFIRMED,
-                    source,
-                    now,
-                    "user",
-                )
-            ],
-        )
+    def _fact(fact_id: str, value, now: datetime, source: str = "v6_form") -> Fact:
+        return Fact(fact_id, [FactVersion(fact_id, 1, value, FactStatus.CONFIRMED, source, now, "user")])
 
-    def to_v7(
-        self,
-        facts: TaxFacts,
-        case_id: str | None = None,
-    ) -> tuple[CaseRecord, FactGraph]:
+    def to_v7(self, facts: TaxFacts, case_id: str | None = None) -> tuple[CaseRecord, FactGraph]:
         now = datetime.now(timezone.utc)
         case_id = case_id or f"case-{uuid4().hex[:12]}"
         original_rate = facts.extra.get("original_levy_rate")
         if original_rate in (None, "") and facts.vat_status == "小规模纳税人":
             original_rate = Decimal("0.03")
-
         values = {
             "case.description": facts.description,
             "case.objective": facts.objective,
@@ -84,21 +49,16 @@ class V6Adapter:
             "transaction.business_date": facts.business_date,
             "transaction.transaction_type": facts.transaction_type,
             "transaction.sales_amount": facts.amount,
-            "transaction.total_sales_same_period": _optional_decimal(
-                facts.extra.get("total_sales_same_period", facts.amount)
-            ),
+            "transaction.total_sales_same_period": _optional_decimal(facts.extra.get("total_sales_same_period", facts.amount)),
             "transaction.amount_period": facts.amount_period,
             "transaction.amount_tax_inclusive": facts.amount_tax_inclusive,
             "transaction.original_levy_rate": _optional_decimal(original_rate),
             "invoice.need": facts.invoice_need,
             "invoice.need_special_invoice": facts.invoice_need == "专用发票",
             "invoice.waive_exemption": bool(facts.extra.get("waive_exemption", False)),
-            "taxpayer.rolling_sales": _optional_decimal(
-                facts.extra.get("rolling_sales")
-            ),
+            "taxpayer.rolling_sales": _optional_decimal(facts.extra.get("rolling_sales")),
             "transaction.related_party": facts.related_party,
-            "transaction.split_signal": bool(facts.extra.get("split_signal"))
-            or "分拆" in facts.description,
+            "transaction.split_signal": bool(facts.extra.get("split_signal")) or "分拆" in facts.description,
             "transaction.cross_border": facts.cross_border,
             "hainan.special_scene": facts.hainan_special_scene,
             "goods_flow.hs_code": facts.hs_code or None,
@@ -122,42 +82,30 @@ class V6Adapter:
             "cit.asset_total_avg": facts.cit_asset_total_avg,
             "cit.restricted_industry": facts.cit_restricted_industry,
             "cit.has_unincorporated_branches": facts.cit_has_unincorporated_branches,
+            "pit.income_category": facts.pit_income_category or None,
+            "pit.resident_status": facts.pit_resident_status or None,
+            "pit.taxpayer_role": facts.pit_taxpayer_role or None,
+            "pit.business_taxable_income": facts.pit_business_taxable_income,
+            "pit.business_other_tax_reduction": facts.pit_business_other_tax_reduction,
+            "pit.business_prepaid_tax": facts.pit_business_prepaid_tax,
+            "pit.multiple_business_sources": facts.pit_multiple_business_sources,
+            "pit.business_income_aggregated": facts.pit_business_income_aggregated,
+            "pit.partnership_allocated_income_confirmed": facts.pit_partnership_allocated_income_confirmed,
+            "pit.labor_gross_income": facts.pit_labor_gross_income,
+            "pit.labor_is_continuous_service": facts.pit_labor_is_continuous_service,
+            "pit.labor_withheld_tax": facts.pit_labor_withheld_tax,
+            "pit.labor_payer_has_withholding_obligation": facts.pit_labor_payer_has_withholding_obligation,
         }
         graph = FactGraph(
-            facts={
-                key: self._fact(key, value, now)
-                for key, value in values.items()
-                if value is not None
-            },
+            facts={key: self._fact(key, value, now) for key, value in values.items() if value is not None},
             nodes={
-                "party-main": {
-                    "node_id": "party-main",
-                    "node_type": "Party",
-                    "name": "纳税主体",
-                    "entity_form": facts.entity_form,
-                },
-                "tx-main": {
-                    "node_id": "tx-main",
-                    "node_type": "Transaction",
-                    "transaction_type": facts.transaction_type,
-                },
+                "party-main": {"node_id": "party-main", "node_type": "Party", "name": "纳税主体", "entity_form": facts.entity_form, "pit_role": facts.pit_taxpayer_role},
+                "tx-main": {"node_id": "tx-main", "node_type": "Transaction", "transaction_type": facts.transaction_type},
             },
-            edges=[],
-            version=1,
+            edges=[], version=1,
         )
-        case = CaseRecord(
-            case_id=case_id,
-            state=CaseState.FACTS_PENDING_CONFIRMATION,
-            kb_version="KB-2026.07.17-V5-PILOT-XJ-HI",
-            rule_set_version=(
-                "tax-rules-v2"
-                if "企业所得税" in facts.requested_tax_types
-                else "vat-rules-v1"
-            ),
-            facts_version=1,
-            created_at=now,
-            updated_at=now,
-        )
+        version = "tax-rules-v3" if "个人所得税" in facts.requested_tax_types else ("tax-rules-v2" if "企业所得税" in facts.requested_tax_types else "vat-rules-v1")
+        case = CaseRecord(case_id, CaseState.FACTS_PENDING_CONFIRMATION, "KB-2026.07.17-V5-PILOT-XJ-HI", version, 1, now, now)
         return case, graph
 
     def from_graph(self, graph: FactGraph) -> TaxFacts:
@@ -165,62 +113,39 @@ class V6Adapter:
             fact = graph.facts.get(fact_id)
             current = fact.current if fact else None
             return current.value if current else default
-
-        return TaxFacts.from_dict(
-            {
-                "business_date": str(value("transaction.business_date", "")),
-                "region": value("region.code", ""),
-                "taxpayer_type": value("taxpayer.type", ""),
-                "vat_status": value("taxpayer.vat_status", "未知"),
-                "transaction_type": value("transaction.transaction_type", "其他"),
-                "amount": value("transaction.sales_amount"),
-                "amount_period": value("transaction.amount_period", "季度"),
-                "amount_tax_inclusive": value(
-                    "transaction.amount_tax_inclusive", False
-                ),
-                "invoice_need": value(
-                    "invoice.need",
-                    "专用发票"
-                    if value("invoice.need_special_invoice", False)
-                    else "普通发票",
-                ),
-                "objective": value("case.objective", "合规降负"),
-                "description": value("case.description", "持久化案件重算"),
-                "requested_tax_types": value(
-                    "case.requested_tax_types", ["增值税"]
-                ),
-                "related_party": value("transaction.related_party", False),
-                "cross_border": value("transaction.cross_border", False),
-                "historical_tax": value("risk.historical_tax", False),
-                "real_estate": value("risk.real_estate", False),
-                "restructuring": value("risk.restructuring", False),
-                "tax_audit": value("risk.tax_audit", False),
-                "hainan_special_scene": value("hainan.special_scene", False),
-                "hs_code": value("goods_flow.hs_code", ""),
-                "qualified_entity": value("hainan.qualified_entity", None),
-                "flow": value("goods_flow.flow", None),
-                "use": value("goods_flow.use", None),
-                "total_sales_same_period": value(
-                    "transaction.total_sales_same_period", None
-                ),
-                "original_levy_rate": value(
-                    "transaction.original_levy_rate", None
-                ),
-                "rolling_sales": value("taxpayer.rolling_sales", None),
-                "waive_exemption": value("invoice.waive_exemption", False),
-                "entity_form": value("cit.entity_form", ""),
-                "cit_resident_status": value("cit.resident_status", ""),
-                "cit_accounting_profit": value("cit.accounting_profit", None),
-                "cit_adjustment_increase": value("cit.adjustment_increase", None),
-                "cit_adjustment_decrease": value("cit.adjustment_decrease", None),
-                "cit_loss_carryforward": value("cit.loss_carryforward", None),
-                "cit_tax_credit": value("cit.tax_credit", None),
-                "cit_prepaid_tax": value("cit.prepaid_tax", None),
-                "cit_employee_count_avg": value("cit.employee_count_avg", None),
-                "cit_asset_total_avg": value("cit.asset_total_avg", None),
-                "cit_restricted_industry": value("cit.restricted_industry", None),
-                "cit_has_unincorporated_branches": value(
-                    "cit.has_unincorporated_branches", False
-                ),
-            }
-        )
+        return TaxFacts.from_dict({
+            "business_date": str(value("transaction.business_date", "")),
+            "region": value("region.code", ""), "taxpayer_type": value("taxpayer.type", ""),
+            "vat_status": value("taxpayer.vat_status", "未知"),
+            "transaction_type": value("transaction.transaction_type", "其他"),
+            "amount": value("transaction.sales_amount"), "amount_period": value("transaction.amount_period", "季度"),
+            "amount_tax_inclusive": value("transaction.amount_tax_inclusive", False),
+            "invoice_need": value("invoice.need", "专用发票" if value("invoice.need_special_invoice", False) else "普通发票"),
+            "objective": value("case.objective", "合规降负"), "description": value("case.description", "持久化案件重算"),
+            "requested_tax_types": value("case.requested_tax_types", ["增值税"]),
+            "related_party": value("transaction.related_party", False), "cross_border": value("transaction.cross_border", False),
+            "historical_tax": value("risk.historical_tax", False), "real_estate": value("risk.real_estate", False),
+            "restructuring": value("risk.restructuring", False), "tax_audit": value("risk.tax_audit", False),
+            "hainan_special_scene": value("hainan.special_scene", False), "hs_code": value("goods_flow.hs_code", ""),
+            "qualified_entity": value("hainan.qualified_entity", None), "flow": value("goods_flow.flow", None), "use": value("goods_flow.use", None),
+            "total_sales_same_period": value("transaction.total_sales_same_period", None),
+            "original_levy_rate": value("transaction.original_levy_rate", None), "rolling_sales": value("taxpayer.rolling_sales", None),
+            "waive_exemption": value("invoice.waive_exemption", False),
+            "entity_form": value("cit.entity_form", ""), "cit_resident_status": value("cit.resident_status", ""),
+            "cit_accounting_profit": value("cit.accounting_profit", None), "cit_adjustment_increase": value("cit.adjustment_increase", None),
+            "cit_adjustment_decrease": value("cit.adjustment_decrease", None), "cit_loss_carryforward": value("cit.loss_carryforward", None),
+            "cit_tax_credit": value("cit.tax_credit", None), "cit_prepaid_tax": value("cit.prepaid_tax", None),
+            "cit_employee_count_avg": value("cit.employee_count_avg", None), "cit_asset_total_avg": value("cit.asset_total_avg", None),
+            "cit_restricted_industry": value("cit.restricted_industry", None), "cit_has_unincorporated_branches": value("cit.has_unincorporated_branches", False),
+            "pit_income_category": value("pit.income_category", ""), "pit_resident_status": value("pit.resident_status", ""),
+            "pit_taxpayer_role": value("pit.taxpayer_role", ""), "pit_business_taxable_income": value("pit.business_taxable_income", None),
+            "pit_business_other_tax_reduction": value("pit.business_other_tax_reduction", None),
+            "pit_business_prepaid_tax": value("pit.business_prepaid_tax", None),
+            "pit_multiple_business_sources": value("pit.multiple_business_sources", False),
+            "pit_business_income_aggregated": value("pit.business_income_aggregated", False),
+            "pit_partnership_allocated_income_confirmed": value("pit.partnership_allocated_income_confirmed", None),
+            "pit_labor_gross_income": value("pit.labor_gross_income", None),
+            "pit_labor_is_continuous_service": value("pit.labor_is_continuous_service", False),
+            "pit_labor_withheld_tax": value("pit.labor_withheld_tax", None),
+            "pit_labor_payer_has_withholding_obligation": value("pit.labor_payer_has_withholding_obligation", None),
+        })

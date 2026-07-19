@@ -1,0 +1,16 @@
+{
+  "rule_id": "PIT-NONRESIDENT-MANUAL-REVIEW",
+  "version": 1,
+  "status": "effective",
+  "valid_from": "2019-01-01",
+  "valid_to": null,
+  "jurisdiction": "CN",
+  "tax_type": "个人所得税",
+  "priority": 130,
+  "when": {"fact": "pit.resident_status", "operator": "equals", "value": "非居民个人"},
+  "then": {"outcome": "pit_manual_review_required", "value": true, "manual_review_required": true, "confidence": "manual_review"},
+  "requires": ["pit.resident_status"],
+  "legal_basis": [{"document_id": "DOC-CN-PIT-LAW-2018", "provision_id": "PROV-PIT-LAW-001-003"}],
+  "description": "非居民个人和无住所个人所得税不由基础模块自动确定",
+  "tags": ["个人所得税", "非居民个人", "人工复核"]
+}

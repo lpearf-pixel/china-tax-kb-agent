@@ -34,12 +34,14 @@ class QueryPlanner:
         historical_flag = bool(_value(facts, "historical_tax", False))
         hainan_special = bool(_value(facts, "hainan_special_scene", False))
         requested = list(_value(facts, "requested_tax_types", ["增值税"]) or ["增值税"])
+        pit_category = str(_value(facts, "pit_income_category", ""))
+        pit_role = str(_value(facts, "pit_taxpayer_role", ""))
         issue_terms: list[str] = []
         for issue in issues or []:
             issue_terms.extend([str(_value(issue, "issue_type", "")), str(_value(issue, "risk_level", ""))])
         historical_requested = historical_flag or any(term in description for term in self.HISTORICAL_TERMS)
         region_name = {"CN-XJ": "新疆", "CN-HI": "海南", "CN": "全国"}.get(region, region)
-        base = _compact(description, " ".join(requested), taxpayer, vat_status, transaction, period, objective, region_name, *issue_terms)
+        base = _compact(description, " ".join(requested), taxpayer, vat_status, transaction, period, objective, region_name, pit_category, pit_role, *issue_terms)
         version_statuses = ["effective", "partially_effective", "pending_review", "uncertain"]
         if historical_requested:
             version_statuses.extend(["repealed", "expired"])
@@ -58,6 +60,11 @@ class QueryPlanner:
             limitation_terms.append("会计利润 纳税调增 纳税调减 亏损弥补 税额抵免 预缴 总分机构合并")
             exclusion_terms.append("个人独资企业 合伙企业 非居民企业 不适用 人工复核")
             optional_eligibility.extend(["企业所得税", "小型微利企业", "25%"])
+        if "个人所得税" in requested:
+            eligibility_terms.append("居民个人 经营所得 5%至35% 个体工商户 200万元减半 劳务报酬预扣")
+            limitation_terms.append("多处经营所得合并 合伙分配 扣缴义务人 劳务报酬费用扣除 综合所得年度汇算")
+            exclusion_terms.append("非居民个人 境外所得 个人独资企业 合伙企业 个体工商户减半不适用")
+            optional_eligibility.extend(["个人所得税", "经营所得", "劳务报酬", "减半", "年度汇算"])
         if related:
             exclusion_terms.append("关联交易 主体分拆")
 

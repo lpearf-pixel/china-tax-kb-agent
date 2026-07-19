@@ -26,13 +26,13 @@ jobs:
       - name: TaxKB and legal-content tests
         run: python3 -m unittest discover -s 90-工具/tests -v
 
-      - name: V7 and V7.2 decision-core tests
+      - name: V7 through V7.2.1 decision-core tests
         run: python3 -m unittest discover -s apps/tax_decision_core/tests -v
 
       - name: V7.1 retrieval tests
         run: python3 -m unittest discover -s apps/tax_retrieval/tests -v
 
-      - name: V6 through V7.2 workbench tests
+      - name: V6 through V7.2.1 workbench tests
         run: python3 -m unittest discover -s apps/tax_workbench/tests -v
 
       - name: Validate Vault metadata and links

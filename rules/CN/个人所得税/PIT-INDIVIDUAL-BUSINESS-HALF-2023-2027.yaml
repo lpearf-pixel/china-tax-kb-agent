@@ -1,0 +1,24 @@
+{
+  "rule_id": "PIT-INDIVIDUAL-BUSINESS-HALF-2023-2027",
+  "version": 1,
+  "status": "effective",
+  "valid_from": "2023-01-01",
+  "valid_to": "2027-12-31",
+  "jurisdiction": "CN",
+  "tax_type": "个人所得税",
+  "priority": 90,
+  "when": {"all": [
+    {"fact": "pit.income_category", "operator": "equals", "value": "经营所得"},
+    {"fact": "pit.resident_status", "operator": "equals", "value": "居民个人"},
+    {"fact": "pit.taxpayer_role", "operator": "equals", "value": "个体工商户业主"},
+    {"any": [
+      {"fact": "pit.multiple_business_sources", "operator": "is_false"},
+      {"fact": "pit.business_income_aggregated", "operator": "is_true"}
+    ]}
+  ]},
+  "then": {"outcome": "pit_individual_business_half_reduction", "value": true},
+  "requires": ["pit.taxpayer_role", "pit.business_taxable_income", "pit.business_other_tax_reduction", "pit.multiple_business_sources"],
+  "legal_basis": [{"document_id": "DOC-CN-PIT-STA-2023-12", "provision_id": "PROV-PIT-INDIVIDUAL-BUSINESS-HALF-2023-12"}],
+  "description": "个体工商户2023至2027年不超过200万元部分减半征收个人所得税",
+  "tags": ["个人所得税", "个体工商户", "减半", "2027到期"]
+}
