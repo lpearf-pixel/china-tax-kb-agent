@@ -157,6 +157,8 @@ class FactGraphService:
             return ("issues", "evidence", "rules", "calculation", "scenarios")
         if fact_id.startswith("invoice."):
             return ("rules", "calculation", "scenarios")
+        if fact_id.startswith("cit."):
+            return ("issues", "rules", "calculation", "scenarios", "human_review")
         if fact_id in {"transaction.related_party", "transaction.split_signal"}:
             return ("issues", "rules", "calculation", "scenarios", "human_review")
         if fact_id in {
