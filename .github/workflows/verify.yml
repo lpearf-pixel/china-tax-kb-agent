@@ -32,8 +32,35 @@ jobs:
       - name: V7.1 retrieval tests
         run: python3 -m unittest discover -s apps/tax_retrieval/tests -v
 
-      - name: V6 through V7.2 workbench tests
-        run: python3 -m unittest discover -s apps/tax_workbench/tests -v
+      - name: Run V7.2.1 workbench tests
+        shell: bash
+        run: |
+          set +e
+          python3 -m unittest discover -s apps/tax_workbench/tests -v > /tmp/v721-workbench.log 2>&1
+          echo "$?" > /tmp/v721-workbench.status
+          exit 0
+
+      - name: Upload V7.2.1 workbench diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: v721-workbench-diagnostics
+          path: |
+            /tmp/v721-workbench.log
+            /tmp/v721-workbench.status
+          if-no-files-found: error
+          retention-days: 3
+
+      - name: Enforce workbench test result
+        shell: bash
+        run: |
+          status="$(cat /tmp/v721-workbench.status)"
+          if [ "$status" -ne 0 ]; then
+            tail -n 160 /tmp/v721-workbench.log
+          else
+            cat /tmp/v721-workbench.log
+          fi
+          exit "$status"
 
       - name: Validate Vault metadata and links
         run: python3 90-工具/taxkb_validate.py --report /tmp/taxkb-validation.md
