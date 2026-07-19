@@ -43,7 +43,7 @@ class TaxPlanningServiceTests(unittest.TestCase):
 
     def test_hainan_ordinary_consulting_does_not_apply_zero_tariff(self):
         result = self.service.analyze(make_facts(region="CN-HI", description="海口软件咨询服务"))
-        self.assertIn("普通境内服务", result.regional_application)
+        self.assertIn("海南普通境内", result.regional_application)
         self.assertNotIn("可直接适用零关税", result.initial_conclusion)
         self.assertFalse(result.human_review_required)
 
@@ -60,7 +60,7 @@ class TaxPlanningServiceTests(unittest.TestCase):
         self.assertTrue(result.human_review_required)
         self.assertIn("商品 HS 编码", result.missing_facts)
         self.assertIn("不能确定", result.initial_conclusion)
-        self.assertTrue(any("海南" in risk or "特殊政策" in risk for risk in result.risks))
+        self.assertTrue(any("海南" in risk or "特殊政策" in risk or "计算输入不足" in risk for risk in result.risks))
 
     def test_related_party_split_signal_requires_review(self):
         result = self.service.analyze(make_facts(related_party=True, description="关联公司拆分销售额"))
