@@ -14,8 +14,11 @@ from urllib.parse import unquote
 from .markdown import save_session
 from .models import (
     AMOUNT_PERIODS,
+    CIT_RESIDENT_STATUSES,
+    ENTITY_FORMS,
     INVOICE_NEEDS,
     REGIONS,
+    SUPPORTED_TAX_TYPES,
     TAXPAYER_TYPES,
     TRANSACTION_TYPES,
     VAT_STATUSES,
@@ -24,12 +27,8 @@ from .models import (
 from .planner import TaxPlanningService
 
 MAX_BODY = 1_000_000
-CASE_RE = re.compile(
-    r"^/api/cases/([A-Za-z0-9][A-Za-z0-9_-]{0,63})(?:/(analyze|review|audit))?$"
-)
-FACT_RE = re.compile(
-    r"^/api/cases/([A-Za-z0-9][A-Za-z0-9_-]{0,63})/facts/(.+)$"
-)
+CASE_RE = re.compile(r"^/api/cases/([A-Za-z0-9][A-Za-z0-9_-]{0,63})(?:/(analyze|review|audit))?$")
+FACT_RE = re.compile(r"^/api/cases/([A-Za-z0-9][A-Za-z0-9_-]{0,63})/facts/(.+)$")
 
 
 def schema_payload() -> dict[str, Any]:
@@ -40,14 +39,31 @@ def schema_payload() -> dict[str, Any]:
         "transaction_types": sorted(TRANSACTION_TYPES),
         "amount_periods": sorted(AMOUNT_PERIODS),
         "invoice_needs": sorted(INVOICE_NEEDS),
+        "supported_tax_types": sorted(SUPPORTED_TAX_TYPES),
+        "entity_forms": sorted(ENTITY_FORMS),
+        "cit_resident_statuses": sorted(CIT_RESIDENT_STATUSES),
+        "cit_fields": [
+            "cit_accounting_profit",
+            "cit_adjustment_increase",
+            "cit_adjustment_decrease",
+            "cit_loss_carryforward",
+            "cit_tax_credit",
+            "cit_prepaid_tax",
+            "cit_employee_count_avg",
+            "cit_asset_total_avg",
+            "cit_restricted_industry",
+            "cit_has_unincorporated_branches",
+        ],
         "objectives": [
             "合规降负",
+            "综合税负",
+            "企业所得税测算",
             "现金流优化",
             "发票与报价",
             "主体身份评估",
             "海南政策预审",
         ],
-        "decision_core": "V7",
+        "decision_core": "V7.2",
     }
 
 
@@ -56,7 +72,7 @@ def make_handler(vault: Path):
     static_file = Path(__file__).resolve().parent / "static" / "index.html"
 
     class Handler(BaseHTTPRequestHandler):
-        server_version = "TaxKBWorkbench/0.2"
+        server_version = "TaxKBWorkbench/0.3"
 
         def log_message(self, format: str, *args: Any) -> None:
             return
@@ -79,9 +95,8 @@ def make_handler(vault: Path):
             self.wfile.write(body)
 
         def _read_json(self) -> dict[str, Any]:
-            raw_length = self.headers.get("Content-Length", "0")
             try:
-                length = int(raw_length)
+                length = int(self.headers.get("Content-Length", "0"))
             except ValueError as exc:
                 raise ValueError("无效 Content-Length") from exc
             if length <= 0 or length > MAX_BODY:
@@ -102,40 +117,24 @@ def make_handler(vault: Path):
         def do_GET(self) -> None:
             path = self.path.split("?", 1)[0]
             if path == "/health":
-                self._json(
-                    HTTPStatus.OK,
-                    {
-                        "status": "ok",
-                        "service": "tax-planning-workbench",
-                        "decision_core": "v7",
-                    },
-                )
+                self._json(HTTPStatus.OK, {"status": "ok", "service": "tax-planning-workbench", "decision_core": "v7.2"})
                 return
             if path == "/api/schema":
                 self._json(HTTPStatus.OK, schema_payload())
                 return
-
             match = CASE_RE.fullmatch(path)
             if match:
                 case_id, action = match.groups()
                 try:
-                    payload = (
-                        {"events": service.audit_case(case_id)}
-                        if action == "audit"
-                        else service.get_case(case_id)
-                    )
+                    payload = {"events": service.audit_case(case_id)} if action == "audit" else service.get_case(case_id)
                 except FileNotFoundError:
                     self._json(HTTPStatus.NOT_FOUND, {"error": "case_not_found"})
                     return
                 self._json(HTTPStatus.OK, payload)
                 return
-
             if path in {"/", "/index.html"}:
                 if not static_file.exists():
-                    self._json(
-                        HTTPStatus.INTERNAL_SERVER_ERROR,
-                        {"error": "前端页面不存在"},
-                    )
+                    self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "前端页面不存在"})
                     return
                 self._html(HTTPStatus.OK, static_file.read_bytes())
                 return
@@ -148,22 +147,14 @@ def make_handler(vault: Path):
             except ValueError as exc:
                 self._json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
                 return
-
             try:
                 if path in {"/api/analyze", "/api/save"}:
                     facts = self._facts(payload)
                     errors = facts.validate()
                     if errors:
-                        self._json(
-                            HTTPStatus.UNPROCESSABLE_ENTITY,
-                            {"error": "validation_failed", "errors": errors},
-                        )
+                        self._json(HTTPStatus.UNPROCESSABLE_ENTITY, {"error": "validation_failed", "errors": errors})
                         return
-                    result = (
-                        service.create_case(facts)
-                        if path == "/api/save"
-                        else service.analyze(facts)
-                    )
+                    result = service.create_case(facts) if path == "/api/save" else service.analyze(facts)
                     response = result.to_dict()
                     response["facts"] = facts.to_dict()
                     if path == "/api/save":
@@ -171,41 +162,30 @@ def make_handler(vault: Path):
                         response["saved_path"] = saved.relative_to(vault).as_posix()
                     self._json(HTTPStatus.OK, response)
                     return
-
                 if path == "/api/cases":
                     facts = self._facts(payload)
                     errors = facts.validate()
                     if errors:
-                        self._json(
-                            HTTPStatus.UNPROCESSABLE_ENTITY,
-                            {"error": "validation_failed", "errors": errors},
-                        )
+                        self._json(HTTPStatus.UNPROCESSABLE_ENTITY, {"error": "validation_failed", "errors": errors})
                         return
                     result = service.create_case(facts)
                     response = result.to_dict()
                     response["facts"] = facts.to_dict()
                     self._json(HTTPStatus.CREATED, response)
                     return
-
                 match = CASE_RE.fullmatch(path)
                 if match:
                     case_id, action = match.groups()
                     if action == "analyze":
-                        self._json(
-                            HTTPStatus.OK,
-                            service.analyze_case(case_id).to_dict(),
-                        )
+                        self._json(HTTPStatus.OK, service.analyze_case(case_id).to_dict())
                         return
                     if action == "review":
-                        self._json(
-                            HTTPStatus.OK,
-                            service.review_case(
-                                case_id,
-                                bool(payload.get("approved")),
-                                str(payload.get("actor") or "reviewer"),
-                                str(payload.get("note") or ""),
-                            ),
-                        )
+                        self._json(HTTPStatus.OK, service.review_case(
+                            case_id,
+                            bool(payload.get("approved")),
+                            str(payload.get("actor") or "reviewer"),
+                            str(payload.get("note") or ""),
+                        ))
                         return
             except FileNotFoundError:
                 self._json(HTTPStatus.NOT_FOUND, {"error": "case_not_found"})
@@ -213,7 +193,6 @@ def make_handler(vault: Path):
             except (ValueError, RuntimeError) as exc:
                 self._json(HTTPStatus.UNPROCESSABLE_ENTITY, {"error": str(exc)})
                 return
-
             self._json(HTTPStatus.NOT_FOUND, {"error": "not_found"})
 
         def do_PATCH(self) -> None:
@@ -242,11 +221,7 @@ def make_handler(vault: Path):
     return Handler
 
 
-def create_server(
-    vault: Path,
-    host: str = "127.0.0.1",
-    port: int = 8765,
-) -> ThreadingHTTPServer:
+def create_server(vault: Path, host: str = "127.0.0.1", port: int = 8765) -> ThreadingHTTPServer:
     return ThreadingHTTPServer((host, port), make_handler(Path(vault).resolve()))
 
 
