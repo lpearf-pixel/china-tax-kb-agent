@@ -5,13 +5,13 @@ from datetime import date
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
-
 REGIONS = {"CN", "CN-XJ", "CN-HI"}
 TAXPAYER_TYPES = {"自然人", "个体工商户", "企业", "其他组织"}
 VAT_STATUSES = {"小规模纳税人", "一般纳税人", "未知"}
 TRANSACTION_TYPES = {"货物", "服务", "无形资产", "不动产", "进口货物", "其他"}
 AMOUNT_PERIODS = {"月", "季度", "单次", "年度"}
 INVOICE_NEEDS = {"普通发票", "专用发票", "不确定", "无需发票"}
+EVIDENCE_ROLES = ("support", "limitation", "exclusion", "historical", "local", "conflict")
 
 
 def _bool(value: Any, default: bool | None = False) -> bool | None:
@@ -63,36 +63,14 @@ class TaxFacts:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "TaxFacts":
-        known = {f.name for f in cls.__dataclass_fields__.values()}
+        known = {item.name for item in cls.__dataclass_fields__.values()}
         values = {key: data.get(key) for key in known if key != "extra"}
         values["amount"] = _decimal(data.get("amount"))
-        for name in (
-            "amount_tax_inclusive",
-            "related_party",
-            "cross_border",
-            "historical_tax",
-            "real_estate",
-            "restructuring",
-            "tax_audit",
-            "hainan_special_scene",
-        ):
+        for name in ("amount_tax_inclusive", "related_party", "cross_border", "historical_tax", "real_estate", "restructuring", "tax_audit", "hainan_special_scene"):
             values[name] = bool(_bool(data.get(name), False))
         values["qualified_entity"] = _bool(data.get("qualified_entity"), None)
-        values["resident_qualification"] = _bool(
-            data.get("resident_qualification"), None
-        )
-        for name in (
-            "business_date",
-            "region",
-            "taxpayer_type",
-            "vat_status",
-            "transaction_type",
-            "amount_period",
-            "invoice_need",
-            "objective",
-            "description",
-            "hs_code",
-        ):
+        values["resident_qualification"] = _bool(data.get("resident_qualification"), None)
+        for name in ("business_date", "region", "taxpayer_type", "vat_status", "transaction_type", "amount_period", "invoice_need", "objective", "description", "hs_code"):
             values[name] = str(data.get(name) or "").strip()
         values["extra"] = {key: value for key, value in data.items() if key not in known}
         return cls(**values)
@@ -110,9 +88,7 @@ class TaxFacts:
         if self.vat_status not in VAT_STATUSES:
             errors.append("vat_status 必须明确小规模纳税人、一般纳税人或未知")
         if self.transaction_type not in TRANSACTION_TYPES:
-            errors.append(
-                "transaction_type 必须明确货物、服务、无形资产、不动产、进口货物或其他"
-            )
+            errors.append("transaction_type 必须明确货物、服务、无形资产、不动产、进口货物或其他")
         if self.amount is None:
             errors.append("amount 必须是有效金额")
         elif self.amount < 0:
@@ -129,11 +105,7 @@ class TaxFacts:
 
     def missing_facts(self) -> list[str]:
         missing: list[str] = []
-        hainan_gate = self.region == "CN-HI" and (
-            self.hainan_special_scene
-            or self.transaction_type == "进口货物"
-            or self.cross_border
-        )
+        hainan_gate = self.region == "CN-HI" and (self.hainan_special_scene or self.transaction_type == "进口货物" or self.cross_border)
         if hainan_gate:
             if not self.hs_code:
                 missing.append("商品 HS 编码")
@@ -147,6 +119,11 @@ class TaxFacts:
             missing.append("客户发票类型要求")
         if self.vat_status == "未知":
             missing.append("增值税纳税人登记身份")
+        if self.vat_status == "一般纳税人" and not any(
+            self.extra.get(key) not in (None, "")
+            for key in ("applicable_levy_rate", "levy_rate", "original_levy_rate")
+        ):
+            missing.append("calculation.levy_rate")
         return missing
 
     def to_dict(self) -> dict[str, Any]:
@@ -166,9 +143,22 @@ class EvidenceItem:
     source_url: str = ""
     jurisdiction_scope: str = "CN"
     evidence_tier: str = "A"
+    role: str = "support"
+    document_id: str = ""
+    provision_id: str = ""
+    valid_from: str = ""
+    valid_to: str = ""
+    status: str = "effective"
+    score_breakdown: dict[str, float] = field(default_factory=dict)
+    match_reasons: list[str] = field(default_factory=list)
+    _retrieval_trace: dict[str, Any] = field(default_factory=dict, repr=False)
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        payload = asdict(self)
+        trace = payload.pop("_retrieval_trace", {})
+        if trace:
+            payload["retrieval_trace"] = trace
+        return payload
 
 
 @dataclass(slots=True)
@@ -198,10 +188,7 @@ class PlanningResult:
     human_review_required: bool = False
     kb_version: str = "KB-2026.07.17-V5-PILOT-XJ-HI"
     verified_at: str = "2026-07-18"
-    disclaimer: str = (
-        "本结果为法规检索和税务规划草案，不替代主管税务机关、"
-        "注册税务师或律师的正式意见。"
-    )
+    disclaimer: str = "本结果为法规检索和税务规划草案，不替代主管税务机关、注册税务师或律师的正式意见。"
     case_id: str = ""
     case_state: str = ""
     issues: list[dict[str, Any]] = field(default_factory=list)
@@ -209,6 +196,21 @@ class PlanningResult:
     calculations: list[dict[str, Any]] = field(default_factory=list)
     scenario_scores: list[dict[str, Any]] = field(default_factory=list)
     audit_events: list[dict[str, Any]] = field(default_factory=list)
+    evidence_groups: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
+    retrieval_trace: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        payload = asdict(self)
+        for row in payload.get("evidence", []):
+            row.pop("_retrieval_trace", None)
+            row.pop("retrieval_trace", None)
+        if not self.evidence_groups:
+            groups = {role: [] for role in EVIDENCE_ROLES}
+            for item in self.evidence:
+                public = item.to_dict()
+                public.pop("retrieval_trace", None)
+                groups.setdefault(item.role, []).append(public)
+            payload["evidence_groups"] = groups
+        if not self.retrieval_trace:
+            payload["retrieval_trace"] = next((item._retrieval_trace for item in self.evidence if item._retrieval_trace), {})
+        return payload

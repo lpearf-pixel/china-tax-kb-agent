@@ -47,7 +47,10 @@ class V7DecisionCorpusTests(unittest.TestCase):
         self.assertGreaterEqual(len(factual), 15)
         for item in factual:
             with self.subTest(case_id=item["id"]):
-                facts = TaxFacts.from_dict(item["facts"])
+                payload = dict(item["facts"])
+                payload.setdefault("description", item.get("description", "税务决策回归场景"))
+                payload.setdefault("objective", "合规降负")
+                facts = TaxFacts.from_dict(payload)
                 result = self.service.analyze(facts)
                 expected = item.get("expected", {})
                 evaluations = {

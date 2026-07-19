@@ -77,7 +77,7 @@ class FactGraphServiceTests(unittest.TestCase):
             self.assertEqual(set(impact.affected_nodes), {"rules", "calculation", "scenarios"})
 
             impact = service.revise_fact(case.case_id, "transaction.business_date", date(2026, 8, 1), "owner")
-            self.assertEqual(set(impact.affected_nodes), {"evidence", "rules", "calculation", "scenarios"})
+            self.assertEqual(set(impact.affected_nodes), {"issues", "evidence", "rules", "calculation", "scenarios"})
 
             graph = service.load_graph(case.case_id)
             versions = graph.facts["invoice.need_special_invoice"].versions

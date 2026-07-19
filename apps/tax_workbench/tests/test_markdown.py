@@ -31,7 +31,7 @@ class MarkdownTests(unittest.TestCase):
 
     def test_render_contains_required_sections_and_citation(self):
         text = render_markdown(self.facts(), self.result())
-        for heading in ("初步结论", "适用前提", "法规依据", "税务方案", "风险与待确认事项", "信息时效"):
+        for heading in ("初步结论", "适用前提", "法规证据包", "税务方案", "风险与待确认事项", "信息时效"):
             self.assertIn(heading, text)
         self.assertIn("2026年第10号", text)
         self.assertIn("KB-TEST", text)

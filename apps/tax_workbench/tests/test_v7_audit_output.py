@@ -44,7 +44,7 @@ class V7AuditOutputTests(unittest.TestCase):
             "税务议题树",
             "规则判断轨迹",
             "税额计算与现金流",
-            "方案评分",
+            "综合评分",
         ):
             self.assertIn(heading, text)
         self.assertIn("VAT-SMALL-THRESHOLD-QUARTER-2026", text)

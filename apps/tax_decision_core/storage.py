@@ -9,7 +9,6 @@ from typing import Any
 
 from .domain import CaseRecord
 
-
 CASE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
 KIND_RE = re.compile(r"^[a-z][a-z0-9_-]{0,31}$")
 
@@ -76,6 +75,16 @@ class CaseStorage:
         self._atomic_json(path, case.to_dict(), overwrite=True)
         return path
 
+    @staticmethod
+    def _retrieval_trace(payload: dict[str, Any]) -> dict[str, Any] | None:
+        items = payload.get("items")
+        if not isinstance(items, list):
+            return None
+        for item in items:
+            if isinstance(item, dict) and isinstance(item.get("retrieval_trace"), dict):
+                return item["retrieval_trace"]
+        return None
+
     def write_version(self, case_id: str, kind: str, version: int, payload: dict[str, Any]) -> Path:
         if version < 1:
             raise ValueError("version must be >= 1")
@@ -85,6 +94,11 @@ class CaseStorage:
         safe_kind = self._validate_kind(kind)
         path = case_dir / f"{safe_kind}-v{version:03d}.json"
         self._atomic_json(path, payload)
+        if safe_kind == "evidence":
+            trace = self._retrieval_trace(payload)
+            if trace:
+                retrieval_path = case_dir / f"retrieval-v{version:03d}.json"
+                self._atomic_json(retrieval_path, trace)
         return path
 
     def load_version(self, case_id: str, kind: str, version: int) -> dict[str, Any]:

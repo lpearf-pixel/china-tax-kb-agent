@@ -13,16 +13,26 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
+      # Pinned to actions/checkout v4.2.2 verified commit.
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
       - name: Show Python version
         run: python3 --version
 
+      - name: Compile Python sources
+        run: python3 -m compileall -q apps 90-工具
+
       - name: TaxKB unit tests
         run: python3 -m unittest discover -s 90-工具/tests -v
 
-      - name: Workbench tests
+      - name: V7 decision core tests
+        run: python3 -m unittest discover -s apps/tax_decision_core/tests -v
+
+      - name: V7.1 retrieval tests
+        run: python3 -m unittest discover -s apps/tax_retrieval/tests -v
+
+      - name: Workbench compatibility tests
         run: python3 -m unittest discover -s apps/tax_workbench/tests -v
 
       - name: Validate Vault metadata and links

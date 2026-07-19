@@ -1,11 +1,11 @@
 # 中国税务知识库 Agent
 
 知识库基线：`KB-2026.07.17-V5-PILOT-XJ-HI`  
-当前开发线：`V7 税务决策核心`
+当前开发线：`V7.1 版本感知混合检索`
 
-以 **Obsidian 为人工知识事实源**，采用条款级检索、安全规则 DSL、确定性规则引擎、Decimal 税额计算、案件状态机和人工审签，辅助查询、解释和比较中国税务方案。
+以 **Obsidian 为人工知识事实源**，采用条款级混合检索、安全规则 DSL、确定性规则引擎、Decimal 税额计算、案件状态机和人工审签，辅助查询、解释和比较中国税务方案。
 
-> 全国增值税底座 + 新疆覆盖层 + 海南自由贸易港覆盖层 + RAG + 规则引擎 + 计算引擎 + 有限 Agent
+> 全国增值税底座 + 新疆覆盖层 + 海南自由贸易港覆盖层 + 混合RAG + 规则引擎 + 计算引擎 + 有限 Agent
 
 ## 当前范围
 
@@ -15,13 +15,16 @@
 - 业务日期：优先覆盖 2026 年增值税新体系；
 - 高风险事项：海南特殊政策、关联交易、不动产、重组、历史补税和稽查强制人工复核。
 
-## V7 决策流程
+## V7.1 决策流程
 
 ```text
 业务事实和资料
 → 事实图谱与事实版本
-→ 税务议题树
-→ 有效A级法规检索
+→ 税务议题树和查询拆解
+→ 日期/地域/效力/A级证据门禁
+→ BM25 + 本地哈希向量召回
+→ RRF融合、关系扩展和版本选择
+→ 支持/限制/排除/历史/地方/冲突证据包
 → 规则判断与排除条件
 → Decimal税额和现金流计算
 → 动态方案生成与透明评分
@@ -29,7 +32,7 @@
 → Obsidian报告和审计时间线
 ```
 
-正式法规依据只能来自 `01-法规原文` 和 `02-条款结构`。概念卡、场景卡、案例和 LLM 输出不能替代正式法源。
+正式法规依据只能来自 `01-法规原文` 和 `02-条款结构`。概念卡、场景卡、案例和 LLM 输出不能替代正式法源。没有有效 A 级支持证据时，系统失败关闭并要求人工复核。
 
 ## 使用 Obsidian
 
@@ -55,16 +58,21 @@ http://127.0.0.1:8765
 - 快速执行无状态分析；
 - 建立本地持久案件；
 - 展示税务议题树；
+- 分开展示支持、限制、排除、历史、地方和冲突证据；
+- 展示子查询、BM25/向量召回、关系扩展和最终评分；
 - 展示规则命中、排除、缺失事实和冲突；
 - 展示税额公式与现金流时间；
 - 动态比较税负、现金流、确定性、资料完备度、复杂度和风险；
 - 修改事实后只重跑受影响节点；
-- 保存 Obsidian 审计报告；
+- 保存 Obsidian 审计报告和 `retrieval-vNNN.json`；
 - 查看案件时间线并记录人工审签。
 
 真实案件默认保存在 `cases/`，会话报告保存在 `16-交互工作台/会话记录/`，两者默认不提交 Git。
 
-详细接口和操作说明见 [V7 决策核心指南](docs/V7-DECISION-CORE.md)。
+详细说明：
+
+- [V7 决策核心指南](docs/V7-DECISION-CORE.md)
+- [V7.1 检索增强指南](docs/V7-1-RETRIEVAL.md)
 
 ## 本地验证
 
@@ -74,10 +82,17 @@ http://127.0.0.1:8765
 python3 -m compileall -q apps 90-工具
 python3 -m unittest discover -s 90-工具/tests -v
 python3 -m unittest discover -s apps/tax_decision_core/tests -v
+python3 -m unittest discover -s apps/tax_retrieval/tests -v
 python3 -m unittest discover -s apps/tax_workbench/tests -v
 python3 90-工具/taxkb_validate.py
 python3 90-工具/taxkb_export.py --profile full
 python3 90-工具/taxkb_eval.py
+```
+
+V7.1 的30题可执行检索语料：
+
+```text
+11-问题测试集/v7_1_retrieval_cases.jsonl
 ```
 
 ## 命令行法规查询
@@ -115,13 +130,14 @@ provision_id → rule_id → case_id → scenario_id
 
 ## 项目文档
 
+- [V7.1 检索增强指南](docs/V7-1-RETRIEVAL.md)
 - [V7 决策核心指南](docs/V7-DECISION-CORE.md)
 - [项目路线图](docs/ROADMAP.md)
 - [安全与使用边界](SECURITY.md)
 - [贡献指南](CONTRIBUTING.md)
 - [V5 正式基线](12-决策记录/V5正式基线.md)
-- [V7 设计文档](docs/superpowers/specs/2026-07-18-tax-decision-core-v7-design.md)
-- [V7 实施计划](docs/superpowers/plans/2026-07-18-tax-decision-core-v7.md)
+- [V7.1 设计文档](docs/superpowers/specs/2026-07-18-tax-retrieval-v7-1-design.md)
+- [V7.1 实施计划](docs/superpowers/plans/2026-07-18-tax-retrieval-v7-1.md)
 
 ## 免责声明
 
