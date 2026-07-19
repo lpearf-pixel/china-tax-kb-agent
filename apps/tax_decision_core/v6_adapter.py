@@ -64,6 +64,7 @@ class V6Adapter:
         values = {
             "case.description": facts.description,
             "case.objective": facts.objective,
+            "case.requested_tax_types": list(facts.requested_tax_types),
             "region.code": facts.region,
             "taxpayer.type": facts.taxpayer_type,
             "taxpayer.vat_status": facts.vat_status,
@@ -95,6 +96,18 @@ class V6Adapter:
             "risk.real_estate": facts.real_estate,
             "risk.restructuring": facts.restructuring,
             "risk.tax_audit": facts.tax_audit,
+            "cit.entity_form": facts.entity_form or None,
+            "cit.resident_status": facts.cit_resident_status or None,
+            "cit.accounting_profit": facts.cit_accounting_profit,
+            "cit.adjustment_increase": facts.cit_adjustment_increase,
+            "cit.adjustment_decrease": facts.cit_adjustment_decrease,
+            "cit.loss_carryforward": facts.cit_loss_carryforward,
+            "cit.tax_credit": facts.cit_tax_credit,
+            "cit.prepaid_tax": facts.cit_prepaid_tax,
+            "cit.employee_count_avg": facts.cit_employee_count_avg,
+            "cit.asset_total_avg": facts.cit_asset_total_avg,
+            "cit.restricted_industry": facts.cit_restricted_industry,
+            "cit.has_unincorporated_branches": facts.cit_has_unincorporated_branches,
         }
         graph = FactGraph(
             facts={
@@ -107,6 +120,7 @@ class V6Adapter:
                     "node_id": "party-main",
                     "node_type": "Party",
                     "name": "纳税主体",
+                    "entity_form": facts.entity_form,
                 },
                 "tx-main": {
                     "node_id": "tx-main",
@@ -121,7 +135,11 @@ class V6Adapter:
             case_id=case_id,
             state=CaseState.FACTS_PENDING_CONFIRMATION,
             kb_version="KB-2026.07.17-V5-PILOT-XJ-HI",
-            rule_set_version="vat-rules-v1",
+            rule_set_version=(
+                "tax-rules-v2"
+                if "企业所得税" in facts.requested_tax_types
+                else "vat-rules-v1"
+            ),
             facts_version=1,
             created_at=now,
             updated_at=now,
@@ -154,6 +172,9 @@ class V6Adapter:
                 ),
                 "objective": value("case.objective", "合规降负"),
                 "description": value("case.description", "持久化案件重算"),
+                "requested_tax_types": value(
+                    "case.requested_tax_types", ["增值税"]
+                ),
                 "related_party": value("transaction.related_party", False),
                 "cross_border": value("transaction.cross_border", False),
                 "historical_tax": value("risk.historical_tax", False),
@@ -173,5 +194,19 @@ class V6Adapter:
                 ),
                 "rolling_sales": value("taxpayer.rolling_sales", None),
                 "waive_exemption": value("invoice.waive_exemption", False),
+                "entity_form": value("cit.entity_form", ""),
+                "cit_resident_status": value("cit.resident_status", ""),
+                "cit_accounting_profit": value("cit.accounting_profit", None),
+                "cit_adjustment_increase": value("cit.adjustment_increase", None),
+                "cit_adjustment_decrease": value("cit.adjustment_decrease", None),
+                "cit_loss_carryforward": value("cit.loss_carryforward", None),
+                "cit_tax_credit": value("cit.tax_credit", None),
+                "cit_prepaid_tax": value("cit.prepaid_tax", None),
+                "cit_employee_count_avg": value("cit.employee_count_avg", None),
+                "cit_asset_total_avg": value("cit.asset_total_avg", None),
+                "cit_restricted_industry": value("cit.restricted_industry", None),
+                "cit_has_unincorporated_branches": value(
+                    "cit.has_unincorporated_branches", False
+                ),
             }
         )
