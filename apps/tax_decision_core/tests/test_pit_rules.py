@@ -47,11 +47,22 @@ class PitRuleTests(unittest.TestCase):
     def test_labor_and_nonresident_routes(self):
         labor = self.evaluations(date(2026, 7, 19), graph(
             pit_income_category="劳务报酬", pit_taxpayer_role="独立劳务个人",
-            pit_labor_gross_income="10000", amount_period="单次",
+            pit_labor_gross_income="10000", pit_labor_withheld_tax="0",
+            pit_labor_payer_has_withholding_obligation=True, amount_period="单次",
         ))
         self.assertTrue(labor["PIT-LABOR-REMUNERATION-RESIDENT-WITHHOLDING"].value)
         nonresident = self.evaluations(date(2026, 7, 19), graph(pit_resident_status="非居民个人"))
         self.assertEqual(nonresident["PIT-NONRESIDENT-MANUAL-REVIEW"].status.value, "manual_review_required")
+
+    def test_labor_rule_is_insufficient_without_confirmed_withholding_duty(self):
+        labor = self.evaluations(date(2026, 7, 19), graph(
+            pit_income_category="劳务报酬", pit_taxpayer_role="独立劳务个人",
+            pit_labor_gross_income="10000", pit_labor_withheld_tax="0",
+            pit_labor_payer_has_withholding_obligation=None, amount_period="单次",
+        ))
+        result = labor["PIT-LABOR-REMUNERATION-RESIDENT-WITHHOLDING"]
+        self.assertEqual(result.status.value, "insufficient_facts")
+        self.assertIn("pit.labor_payer_has_withholding_obligation", result.missing_fact_ids)
 
 
 if __name__ == "__main__":
