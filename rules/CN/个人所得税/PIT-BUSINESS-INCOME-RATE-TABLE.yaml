@@ -1,0 +1,19 @@
+{
+  "rule_id": "PIT-BUSINESS-INCOME-RATE-TABLE",
+  "version": 1,
+  "status": "effective",
+  "valid_from": "2019-01-01",
+  "valid_to": null,
+  "jurisdiction": "CN",
+  "tax_type": "个人所得税",
+  "priority": 50,
+  "when": {"all": [
+    {"fact": "pit.income_category", "operator": "equals", "value": "经营所得"},
+    {"fact": "pit.resident_status", "operator": "equals", "value": "居民个人"}
+  ]},
+  "then": {"outcome": "pit_business_rate_table", "value": true},
+  "requires": ["pit.income_category", "pit.resident_status", "pit.business_taxable_income"],
+  "legal_basis": [{"document_id": "DOC-CN-PIT-LAW-2018", "provision_id": "PROV-PIT-BUSINESS-RATE-TABLE"}],
+  "description": "经营所得适用5%至35%五级超额累进税率表",
+  "tags": ["个人所得税", "经营所得", "税率表"]
+}
