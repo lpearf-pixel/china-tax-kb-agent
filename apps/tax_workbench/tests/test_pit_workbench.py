@@ -66,6 +66,15 @@ class PitWorkbenchTests(unittest.TestCase):
         self.assertIn("年度汇算", result.initial_conclusion)
         self.assertIn("年度汇算", render_markdown(facts, result))
 
+    def test_labor_without_confirmed_withholding_obligation_fails_closed(self):
+        facts = labor(pit_labor_payer_has_withholding_obligation=None)
+        result = self.service().analyze(facts)
+        pit = next(row for row in result.calculations if row["tax_type"] == "个人所得税")
+        self.assertEqual(pit["status"], "unable_to_calculate")
+        self.assertIn("pit.labor_payer_has_withholding_obligation", pit["missing_fact_ids"])
+        self.assertIn("pit.labor_payer_has_withholding_obligation", result.missing_facts)
+        self.assertTrue(result.human_review_required)
+
     def test_vat_and_pit_have_separate_breakdown(self):
         facts = business(requested_tax_types=["增值税", "个人所得税"], amount="400000", total_sales_same_period="400000", original_levy_rate="0.03")
         result = self.service().analyze(facts)
