@@ -3,6 +3,7 @@ import unittest
 from decimal import Decimal
 from pathlib import Path
 
+from apps.tax_workbench.markdown import render_markdown
 from apps.tax_workbench.models import TaxFacts
 from apps.tax_workbench.planner import TaxPlanningService
 
@@ -56,12 +57,17 @@ class MultiTaxWorkbenchTests(unittest.TestCase):
         self.assertEqual(set(result.schemes[0].tax_breakdown), {"企业所得税"})
 
     def test_combined_request_returns_tax_breakdown_and_total(self):
-        result = self.service().analyze(payload(requested_tax_types=["增值税", "企业所得税"]))
+        facts = payload(requested_tax_types=["增值税", "企业所得税"])
+        result = self.service().analyze(facts)
         self.assertEqual({row["tax_type"] for row in result.calculations}, {"增值税", "企业所得税"})
         scheme = result.schemes[0]
         self.assertIn("增值税", scheme.tax_breakdown)
         self.assertIn("企业所得税", scheme.tax_breakdown)
         self.assertEqual(Decimal(scheme.estimated_tax), sum(scheme.tax_breakdown.values()))
+        report = render_markdown(facts, result)
+        self.assertIn("税种分项", report)
+        self.assertIn("企业所得税", report)
+        self.assertIn("综合税负", report)
 
     def test_2028_uses_general_cit_rate_not_expired_small_profit_rule(self):
         result = self.service().analyze(payload(business_date="2028-01-01", requested_tax_types=["企业所得税"]))
