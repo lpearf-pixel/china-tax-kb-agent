@@ -17,6 +17,9 @@ from .models import (
     CIT_RESIDENT_STATUSES,
     ENTITY_FORMS,
     INVOICE_NEEDS,
+    PIT_INCOME_CATEGORIES,
+    PIT_RESIDENT_STATUSES,
+    PIT_TAXPAYER_ROLES,
     REGIONS,
     SUPPORTED_TAX_TYPES,
     TAXPAYER_TYPES,
@@ -42,6 +45,9 @@ def schema_payload() -> dict[str, Any]:
         "supported_tax_types": sorted(SUPPORTED_TAX_TYPES),
         "entity_forms": sorted(ENTITY_FORMS),
         "cit_resident_statuses": sorted(CIT_RESIDENT_STATUSES),
+        "pit_income_categories": sorted(PIT_INCOME_CATEGORIES),
+        "pit_resident_statuses": sorted(PIT_RESIDENT_STATUSES),
+        "pit_taxpayer_roles": sorted(PIT_TAXPAYER_ROLES),
         "cit_fields": [
             "cit_accounting_profit",
             "cit_adjustment_increase",
@@ -54,16 +60,32 @@ def schema_payload() -> dict[str, Any]:
             "cit_restricted_industry",
             "cit_has_unincorporated_branches",
         ],
+        "pit_fields": [
+            "pit_income_category",
+            "pit_resident_status",
+            "pit_taxpayer_role",
+            "pit_business_taxable_income",
+            "pit_business_other_tax_reduction",
+            "pit_business_prepaid_tax",
+            "pit_multiple_business_sources",
+            "pit_business_income_aggregated",
+            "pit_partnership_allocated_income_confirmed",
+            "pit_labor_gross_income",
+            "pit_labor_is_continuous_service",
+            "pit_labor_withheld_tax",
+            "pit_labor_payer_has_withholding_obligation",
+        ],
         "objectives": [
             "合规降负",
             "综合税负",
             "企业所得税测算",
+            "个人所得税测算",
             "现金流优化",
             "发票与报价",
             "主体身份评估",
             "海南政策预审",
         ],
-        "decision_core": "V7.2",
+        "decision_core": "V7.2.1",
     }
 
 
@@ -72,7 +94,7 @@ def make_handler(vault: Path):
     static_file = Path(__file__).resolve().parent / "static" / "index.html"
 
     class Handler(BaseHTTPRequestHandler):
-        server_version = "TaxKBWorkbench/0.3"
+        server_version = "TaxKBWorkbench/0.4"
 
         def log_message(self, format: str, *args: Any) -> None:
             return
@@ -117,7 +139,7 @@ def make_handler(vault: Path):
         def do_GET(self) -> None:
             path = self.path.split("?", 1)[0]
             if path == "/health":
-                self._json(HTTPStatus.OK, {"status": "ok", "service": "tax-planning-workbench", "decision_core": "v7.2"})
+                self._json(HTTPStatus.OK, {"status": "ok", "service": "tax-planning-workbench", "decision_core": "v7.2.1"})
                 return
             if path == "/api/schema":
                 self._json(HTTPStatus.OK, schema_payload())
