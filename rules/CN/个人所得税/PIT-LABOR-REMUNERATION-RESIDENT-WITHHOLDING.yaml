@@ -1,0 +1,20 @@
+{
+  "rule_id": "PIT-LABOR-REMUNERATION-RESIDENT-WITHHOLDING",
+  "version": 1,
+  "status": "effective",
+  "valid_from": "2019-01-01",
+  "valid_to": null,
+  "jurisdiction": "CN",
+  "tax_type": "个人所得税",
+  "priority": 70,
+  "when": {"all": [
+    {"fact": "pit.income_category", "operator": "equals", "value": "劳务报酬"},
+    {"fact": "pit.resident_status", "operator": "equals", "value": "居民个人"},
+    {"fact": "pit.taxpayer_role", "operator": "equals", "value": "独立劳务个人"}
+  ]},
+  "then": {"outcome": "pit_labor_withholding_required", "value": true},
+  "requires": ["pit.income_category", "pit.resident_status", "pit.taxpayer_role", "pit.labor_gross_income"],
+  "legal_basis": [{"document_id": "DOC-CN-PIT-STA-2018-61", "provision_id": "PROV-PIT-LABOR-WITHHOLDING"}],
+  "description": "居民个人劳务报酬按次或按月预扣预缴个人所得税",
+  "tags": ["个人所得税", "劳务报酬", "预扣预缴"]
+}
