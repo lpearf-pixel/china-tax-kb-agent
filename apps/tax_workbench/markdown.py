@@ -146,6 +146,12 @@ def render_markdown(facts: TaxFacts, result: PlanningResult) -> str:
         f"- 企业实体形式：{facts.entity_form or '未选择'}",
         f"- 企业所得税居民身份：{facts.cit_resident_status or '未选择'}",
         f"- 会计利润：{facts.cit_accounting_profit if facts.cit_accounting_profit is not None else '未提供'}",
+        f"- 个人所得税所得类别：{facts.pit_income_category or '未选择'}",
+        f"- 个人所得税居民身份：{facts.pit_resident_status or '未选择'}",
+        f"- 个人所得税纳税角色：{facts.pit_taxpayer_role or '未选择'}",
+        f"- 经营所得应纳税所得额：{facts.pit_business_taxable_income if facts.pit_business_taxable_income is not None else '未提供'}",
+        f"- 劳务报酬收入：{facts.pit_labor_gross_income if facts.pit_labor_gross_income is not None else '未提供'}",
+        f"- 支付方扣缴义务：{'已确认' if facts.pit_labor_payer_has_withholding_obligation is True else '未确认' if facts.pit_labor_payer_has_withholding_obligation is None else '否'}",
         f"- 是否关联交易：{'是' if facts.related_party else '否'}", "",
         "## 税务议题树", "",
     ]
@@ -167,7 +173,7 @@ def render_markdown(facts: TaxFacts, result: PlanningResult) -> str:
     lines += ["## 规则判断轨迹", ""]
     for evaluation in result.rule_trace or []:
         lines += [
-            f"### `{evaluation.get('rule_id', '')}`｜{_status_label(str(evaluation.get('status', '')))}", "",
+            f"### `{evaluation.get('rule_id', '')}`｜{_status_label(str(evaluation.get('status', ''))) }", "",
             f"- 输出：`{evaluation.get('outcome', '')}` = `{_value(evaluation.get('value'))}`",
             f"- 优先级：{evaluation.get('priority', 0)}",
         ]
@@ -188,6 +194,8 @@ def render_markdown(facts: TaxFacts, result: PlanningResult) -> str:
             f"- 公式：{calculation.get('formula', '')}",
             f"- 使用规则：{', '.join(calculation.get('rule_ids', [])) or '无'}",
         ]
+        if calculation.get("tax_type") == "个人所得税" and calculation.get("status") == "conditional_determinate":
+            lines.append("- 重要边界：当前金额属于预扣候选，不等于年度最终税负；居民个人年度终了后仍需按规定汇算。")
         if calculation.get("missing_fact_ids"):
             lines.append(f"- 缺失输入：{', '.join(calculation['missing_fact_ids'])}")
         for event in calculation.get("cashflow_events", []):
