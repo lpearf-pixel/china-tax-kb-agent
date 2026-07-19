@@ -11,19 +11,21 @@ VAT_STATUSES = {"小规模纳税人", "一般纳税人", "未知"}
 TRANSACTION_TYPES = {"货物", "服务", "无形资产", "不动产", "进口货物", "其他"}
 AMOUNT_PERIODS = {"月", "季度", "单次", "年度"}
 INVOICE_NEEDS = {"普通发票", "专用发票", "不确定", "无需发票"}
-SUPPORTED_TAX_TYPES = {"增值税", "企业所得税"}
+SUPPORTED_TAX_TYPES = {"增值税", "企业所得税", "个人所得税"}
 ENTITY_FORMS = {"公司制企业", "个人独资企业", "合伙企业", "其他组织"}
 CIT_RESIDENT_STATUSES = {"居民企业", "非居民企业", "未知"}
+PIT_INCOME_CATEGORIES = {"经营所得", "劳务报酬"}
+PIT_RESIDENT_STATUSES = {"居民个人", "非居民个人", "未知"}
+PIT_TAXPAYER_ROLES = {"个体工商户业主", "个人独资企业投资者", "合伙企业自然人合伙人", "独立劳务个人"}
 EVIDENCE_ROLES = ("support", "limitation", "exclusion", "historical", "local", "conflict")
 CIT_DECIMAL_FIELDS = (
-    "cit_accounting_profit",
-    "cit_adjustment_increase",
-    "cit_adjustment_decrease",
-    "cit_loss_carryforward",
-    "cit_tax_credit",
-    "cit_prepaid_tax",
-    "cit_employee_count_avg",
-    "cit_asset_total_avg",
+    "cit_accounting_profit", "cit_adjustment_increase", "cit_adjustment_decrease",
+    "cit_loss_carryforward", "cit_tax_credit", "cit_prepaid_tax",
+    "cit_employee_count_avg", "cit_asset_total_avg",
+)
+PIT_DECIMAL_FIELDS = (
+    "pit_business_taxable_income", "pit_business_other_tax_reduction",
+    "pit_business_prepaid_tax", "pit_labor_gross_income", "pit_labor_withheld_tax",
 )
 
 
@@ -93,6 +95,19 @@ class TaxFacts:
     cit_asset_total_avg: Decimal | None = None
     cit_restricted_industry: bool | None = None
     cit_has_unincorporated_branches: bool = False
+    pit_income_category: str = ""
+    pit_resident_status: str = ""
+    pit_taxpayer_role: str = ""
+    pit_business_taxable_income: Decimal | None = None
+    pit_business_other_tax_reduction: Decimal | None = None
+    pit_business_prepaid_tax: Decimal | None = None
+    pit_multiple_business_sources: bool = False
+    pit_business_income_aggregated: bool = False
+    pit_partnership_allocated_income_confirmed: bool | None = None
+    pit_labor_gross_income: Decimal | None = None
+    pit_labor_is_continuous_service: bool = False
+    pit_labor_withheld_tax: Decimal | None = None
+    pit_labor_payer_has_withholding_obligation: bool | None = None
     extra: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
@@ -101,36 +116,25 @@ class TaxFacts:
         values = {key: data.get(key) for key in known if key != "extra"}
         values["amount"] = _decimal(data.get("amount"))
         values["requested_tax_types"] = _tax_types(data.get("requested_tax_types"))
-        for name in CIT_DECIMAL_FIELDS:
+        for name in CIT_DECIMAL_FIELDS + PIT_DECIMAL_FIELDS:
             values[name] = _decimal(data.get(name))
         for name in (
-            "amount_tax_inclusive",
-            "related_party",
-            "cross_border",
-            "historical_tax",
-            "real_estate",
-            "restructuring",
-            "tax_audit",
-            "hainan_special_scene",
-            "cit_has_unincorporated_branches",
+            "amount_tax_inclusive", "related_party", "cross_border", "historical_tax",
+            "real_estate", "restructuring", "tax_audit", "hainan_special_scene",
+            "cit_has_unincorporated_branches", "pit_multiple_business_sources",
+            "pit_business_income_aggregated", "pit_labor_is_continuous_service",
         ):
             values[name] = bool(_bool(data.get(name), False))
-        values["qualified_entity"] = _bool(data.get("qualified_entity"), None)
-        values["resident_qualification"] = _bool(data.get("resident_qualification"), None)
-        values["cit_restricted_industry"] = _bool(data.get("cit_restricted_industry"), None)
         for name in (
-            "business_date",
-            "region",
-            "taxpayer_type",
-            "vat_status",
-            "transaction_type",
-            "amount_period",
-            "invoice_need",
-            "objective",
-            "description",
-            "hs_code",
-            "entity_form",
-            "cit_resident_status",
+            "qualified_entity", "resident_qualification", "cit_restricted_industry",
+            "pit_partnership_allocated_income_confirmed", "pit_labor_payer_has_withholding_obligation",
+        ):
+            values[name] = _bool(data.get(name), None)
+        for name in (
+            "business_date", "region", "taxpayer_type", "vat_status", "transaction_type",
+            "amount_period", "invoice_need", "objective", "description", "hs_code",
+            "entity_form", "cit_resident_status", "pit_income_category",
+            "pit_resident_status", "pit_taxpayer_role",
         ):
             values[name] = str(data.get(name) or "").strip()
         values["extra"] = {key: value for key, value in data.items() if key not in known}
@@ -166,6 +170,13 @@ class TaxFacts:
                 errors.append("entity_form 必须明确公司制企业、个人独资企业、合伙企业或其他组织")
             if self.cit_resident_status not in CIT_RESIDENT_STATUSES:
                 errors.append("cit_resident_status 必须明确居民企业、非居民企业或未知")
+        if "个人所得税" in self.requested_tax_types:
+            if self.pit_income_category not in PIT_INCOME_CATEGORIES:
+                errors.append("pit_income_category 必须明确经营所得或劳务报酬")
+            if self.pit_resident_status not in PIT_RESIDENT_STATUSES:
+                errors.append("pit_resident_status 必须明确居民个人、非居民个人或未知")
+            if self.pit_taxpayer_role not in PIT_TAXPAYER_ROLES:
+                errors.append("pit_taxpayer_role 必须明确个人所得税纳税人角色")
         if not self.objective:
             errors.append("objective 必须明确规划目标")
         if not self.description:
@@ -189,30 +200,34 @@ class TaxFacts:
         if "增值税" in self.requested_tax_types and self.vat_status == "未知":
             missing.append("增值税纳税人登记身份")
         if "增值税" in self.requested_tax_types and self.vat_status == "一般纳税人" and not any(
-            self.extra.get(key) not in (None, "")
-            for key in ("applicable_levy_rate", "levy_rate", "original_levy_rate")
+            self.extra.get(key) not in (None, "") for key in ("applicable_levy_rate", "levy_rate", "original_levy_rate")
         ):
             missing.append("calculation.levy_rate")
         if "企业所得税" in self.requested_tax_types:
-            if not self.entity_form:
-                missing.append("cit.entity_form")
-            if not self.cit_resident_status:
-                missing.append("cit.resident_status")
-            for field_name in (
-                "cit_accounting_profit",
-                "cit_adjustment_increase",
-                "cit_adjustment_decrease",
-                "cit_loss_carryforward",
-                "cit_tax_credit",
-                "cit_prepaid_tax",
-            ):
+            for field_name in ("cit_accounting_profit", "cit_adjustment_increase", "cit_adjustment_decrease", "cit_loss_carryforward", "cit_tax_credit", "cit_prepaid_tax"):
                 if getattr(self, field_name) is None:
                     missing.append(field_name.replace("cit_", "cit.", 1))
+        if "个人所得税" in self.requested_tax_types:
+            if self.pit_income_category == "经营所得":
+                for field_name in ("pit_business_taxable_income", "pit_business_other_tax_reduction", "pit_business_prepaid_tax"):
+                    if getattr(self, field_name) is None:
+                        missing.append(field_name.replace("pit_", "pit.", 1))
+                if self.pit_multiple_business_sources and not self.pit_business_income_aggregated:
+                    missing.append("pit.business_income_aggregated")
+                if self.pit_taxpayer_role == "合伙企业自然人合伙人" and not self.pit_partnership_allocated_income_confirmed:
+                    missing.append("pit.partnership_allocated_income_confirmed")
+            elif self.pit_income_category == "劳务报酬":
+                if self.pit_labor_gross_income is None:
+                    missing.append("pit.labor_gross_income")
+                if self.pit_labor_withheld_tax is None:
+                    missing.append("pit.labor_withheld_tax")
+                if self.pit_labor_payer_has_withholding_obligation is None:
+                    missing.append("pit.labor_payer_has_withholding_obligation")
         return list(dict.fromkeys(missing))
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
-        for name in ("amount",) + CIT_DECIMAL_FIELDS:
+        for name in ("amount",) + CIT_DECIMAL_FIELDS + PIT_DECIMAL_FIELDS:
             value = getattr(self, name)
             payload[name] = str(value) if value is not None else None
         return payload
@@ -273,7 +288,7 @@ class PlanningResult:
     missing_facts: list[str] = field(default_factory=list)
     human_review_required: bool = False
     kb_version: str = "KB-2026.07.17-V5-PILOT-XJ-HI"
-    verified_at: str = "2026-07-18"
+    verified_at: str = "2026-07-19"
     disclaimer: str = "本结果为法规检索和税务规划草案，不替代主管税务机关、注册税务师或律师的正式意见。"
     case_id: str = ""
     case_state: str = ""
