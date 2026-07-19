@@ -27,6 +27,19 @@ def _optional_decimal(value):
         raise ValueError(f"invalid numeric fact: {value!r}") from exc
 
 
+def _estimated_taxable_income(facts: TaxFacts) -> Decimal | None:
+    values = (
+        facts.cit_accounting_profit,
+        facts.cit_adjustment_increase,
+        facts.cit_adjustment_decrease,
+        facts.cit_loss_carryforward,
+    )
+    if any(value is None for value in values):
+        return None
+    profit, increase, decrease, loss = values
+    return profit + increase - decrease - loss
+
+
 class V6Adapter:
     @staticmethod
     def _fact(
@@ -102,6 +115,7 @@ class V6Adapter:
             "cit.adjustment_increase": facts.cit_adjustment_increase,
             "cit.adjustment_decrease": facts.cit_adjustment_decrease,
             "cit.loss_carryforward": facts.cit_loss_carryforward,
+            "cit.estimated_taxable_income": _estimated_taxable_income(facts),
             "cit.tax_credit": facts.cit_tax_credit,
             "cit.prepaid_tax": facts.cit_prepaid_tax,
             "cit.employee_count_avg": facts.cit_employee_count_avg,
